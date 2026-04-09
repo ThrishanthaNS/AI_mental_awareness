@@ -3,11 +3,12 @@ Database session management.
 """
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from app.core.config import get_settings
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./app.db"
+settings = get_settings()
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    settings.DATABASE_URL, connect_args={"check_same_thread": False}
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

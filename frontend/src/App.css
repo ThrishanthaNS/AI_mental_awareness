@@ -2,8 +2,8 @@
 
 :root {
   color-scheme: dark;
-  --bg-0: #090b10;
-  --bg-1: #111521;
+  --bg-0: #07101d;
+  --bg-1: #0f1c2f;
   --bg-card: rgba(17, 22, 33, 0.82);
   --bg-card-strong: rgba(16, 20, 30, 0.95);
   --ink: #eef2ff;
@@ -13,13 +13,14 @@
   --radius-xl: 22px;
   --radius-lg: 16px;
   --radius-md: 12px;
-  --risk-low: #2fd08b;
-  --risk-med: #f6c743;
-  --risk-high: #ff5c70;
-  --accent-a: #4dd4ff;
-  --accent-b: #5f7bff;
+  --risk-low: #4dc9ff;
+  --risk-med: #68a9ff;
+  --risk-high: #8a89ff;
+  --accent-a: #47b6ff;
+  --accent-b: #5d9dff;
+  --accent-c: #7f8dff;
   --signal-behavioral: #4dd4ff;
-  --signal-emotional: #a28bff;
+  --signal-emotional: #ff9a64;
   --signal-context: #44d39a;
 }
 
@@ -39,9 +40,38 @@ body {
   color: var(--ink);
   font-family: Manrope, 'Segoe UI', sans-serif;
   background:
-    radial-gradient(900px 500px at 82% -10%, rgba(77, 212, 255, 0.16), transparent 62%),
-    radial-gradient(900px 500px at 10% 0%, rgba(95, 123, 255, 0.2), transparent 58%),
+    radial-gradient(900px 500px at 88% -10%, rgba(71, 217, 255, 0.2), transparent 60%),
+    radial-gradient(900px 500px at 8% 0%, rgba(93, 157, 255, 0.18), transparent 56%),
+    radial-gradient(740px 430px at 45% 100%, rgba(127, 141, 255, 0.16), transparent 64%),
     linear-gradient(160deg, var(--bg-0), var(--bg-1));
+  overflow-x: hidden;
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.45;
+}
+
+body::before {
+  top: 8%;
+  left: -120px;
+  background: rgba(71, 217, 255, 0.3);
+  animation: floatBlobA 12s ease-in-out infinite;
+}
+
+body::after {
+  right: -120px;
+  bottom: 10%;
+  background: rgba(127, 141, 255, 0.28);
+  animation: floatBlobB 14s ease-in-out infinite;
 }
 
 a {
@@ -63,6 +93,7 @@ button {
 .app-shell {
   min-height: 100vh;
   padding-bottom: 96px;
+  position: relative;
 }
 
 .dashboard-page,
@@ -110,7 +141,8 @@ button {
   font-size: 1.03rem;
   font-weight: 700;
   color: #05131f;
-  background: linear-gradient(135deg, #66e5ff, #8c9fff);
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-c));
+  box-shadow: 0 10px 18px rgba(71, 217, 255, 0.35);
 }
 
 .brand-copy {
@@ -160,14 +192,34 @@ button {
   box-shadow: var(--shadow);
 }
 
+.hero-card,
+.card,
+.intervention-card,
+.burnout-card,
+.chatbot-container,
+.chat-page header,
+.video-chat-panel,
+.navbar {
+  transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.hero-card:hover,
+.card:hover,
+.intervention-card:hover,
+.burnout-card:hover,
+.chatbot-container:hover {
+  transform: translateY(-2px);
+  border-color: rgba(151, 198, 248, 0.38);
+}
+
 .hero-card {
   padding: 24px;
   display: grid;
   grid-template-columns: minmax(120px, auto) 1fr;
   gap: 22px;
   background:
-    radial-gradient(420px 180px at 88% -35%, rgba(77, 212, 255, 0.2), transparent 70%),
-    radial-gradient(360px 200px at 0% 120%, rgba(95, 123, 255, 0.2), transparent 72%),
+    radial-gradient(420px 180px at 88% -35%, rgba(71, 217, 255, 0.24), transparent 70%),
+    radial-gradient(360px 200px at 0% 120%, rgba(105, 255, 178, 0.2), transparent 72%),
     var(--bg-card-strong);
 }
 
@@ -229,9 +281,9 @@ button {
 }
 
 .risk-badge.medium {
-  border: 1px solid rgba(246, 199, 67, 0.4);
+  border: 1px solid rgba(255, 214, 75, 0.45);
   color: var(--risk-med);
-  background: rgba(246, 199, 67, 0.12);
+  background: rgba(255, 214, 75, 0.14);
 }
 
 .risk-badge.high {
@@ -249,6 +301,21 @@ button {
 .intervention-card,
 .burnout-card {
   padding: 22px;
+}
+
+.insights-grid .card {
+  position: relative;
+  overflow: hidden;
+}
+
+.insights-grid .card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.06) 48%, transparent 100%);
+  transform: translateX(-115%);
+  animation: softShine 8s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .card-title {
@@ -368,11 +435,11 @@ button {
 }
 
 .risk-item {
-  background: rgba(255, 92, 112, 0.1);
+  background: linear-gradient(120deg, rgba(93, 157, 255, 0.18), rgba(127, 141, 255, 0.12));
 }
 
 .recommendation-item {
-  background: rgba(47, 208, 139, 0.1);
+  background: linear-gradient(120deg, rgba(71, 182, 255, 0.16), rgba(93, 157, 255, 0.12));
   cursor: pointer;
 }
 
@@ -404,7 +471,8 @@ button {
 
 .intervention-card {
   background:
-    radial-gradient(400px 200px at 95% 0%, rgba(77, 212, 255, 0.12), transparent 72%),
+    radial-gradient(400px 200px at 95% 0%, rgba(71, 217, 255, 0.16), transparent 72%),
+    radial-gradient(300px 160px at 5% 90%, rgba(127, 141, 255, 0.16), transparent 70%),
     rgba(10, 15, 25, 0.9);
 }
 
@@ -429,7 +497,7 @@ button {
 }
 
 .burnout-card {
-  background: linear-gradient(125deg, rgba(255, 92, 112, 0.16), rgba(95, 123, 255, 0.12));
+  background: linear-gradient(125deg, rgba(93, 157, 255, 0.2), rgba(127, 141, 255, 0.15));
 }
 
 .burnout-status {
@@ -453,7 +521,7 @@ button {
 }
 
 .burnout-indicator.medium {
-  background: var(--risk-medium);
+  background: var(--risk-med);
   box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
 }
 
@@ -488,7 +556,7 @@ button {
   border: 0;
   border-radius: 12px;
   padding: 12px 28px;
-  background: linear-gradient(135deg, var(--accent-a), var(--accent-b));
+  background: linear-gradient(135deg, var(--accent-a), var(--accent-b), var(--accent-c));
   color: #08131f;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -541,6 +609,9 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background:
+    radial-gradient(280px 140px at 88% -10%, rgba(71, 217, 255, 0.2), transparent 68%),
+    rgba(17, 22, 33, 0.82);
 }
 
 .chat-page h1 {
@@ -656,7 +727,13 @@ button {
   padding: 8px 12px;
   font-size: 0.83rem;
   color: #d8e4ff;
-  background: rgba(95, 123, 255, 0.1);
+  background: linear-gradient(120deg, rgba(71, 217, 255, 0.16), rgba(127, 141, 255, 0.14));
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.prompt-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(71, 217, 255, 0.2);
 }
 
 .message {
@@ -666,16 +743,17 @@ button {
   border: 1px solid var(--line);
   font-size: 0.92rem;
   line-height: 1.55;
+  animation: messagePop 280ms ease;
 }
 
 .message.user {
   margin-left: auto;
-  background: rgba(77, 212, 255, 0.14);
+  background: linear-gradient(120deg, rgba(71, 217, 255, 0.18), rgba(105, 255, 178, 0.12));
 }
 
 .message.assistant {
   margin-right: auto;
-  background: rgba(95, 123, 255, 0.14);
+  background: linear-gradient(120deg, rgba(127, 141, 255, 0.12), rgba(71, 217, 255, 0.12));
 }
 
 .message p {
@@ -687,6 +765,35 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.video-analysis-card {
+  margin: 8px 0 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(77, 212, 255, 0.32);
+  background: rgba(77, 212, 255, 0.08);
+}
+
+.video-analysis-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #96e9ff;
+  margin-bottom: 8px;
+}
+
+.video-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px 10px;
+  font-size: 0.84rem;
+}
+
+.analyze-btn {
+  border-color: rgba(127, 141, 255, 0.45);
+  background: rgba(127, 141, 255, 0.16);
 }
 
 .chat-input-section {
@@ -757,6 +864,12 @@ button {
   background: rgba(20, 25, 38, 0.9);
 }
 
+.send-btn:hover,
+.media-btn:hover {
+  border-color: rgba(71, 217, 255, 0.45);
+  transform: translateY(-1px);
+}
+
 .send-btn {
   min-width: 50px;
   font-weight: 800;
@@ -797,6 +910,20 @@ button {
   font-size: 0.88rem;
 }
 
+.reveal {
+  opacity: 0;
+  transform: translateY(14px) scale(0.99);
+  animation: revealUp 620ms cubic-bezier(0.19, 1, 0.22, 1) forwards;
+}
+
+.reveal-1 { animation-delay: 60ms; }
+.reveal-2 { animation-delay: 120ms; }
+.reveal-3 { animation-delay: 180ms; }
+.reveal-4 { animation-delay: 240ms; }
+.reveal-5 { animation-delay: 300ms; }
+.reveal-6 { animation-delay: 360ms; }
+.reveal-7 { animation-delay: 420ms; }
+
 @keyframes pulse {
   0% {
     transform: scale(1);
@@ -809,6 +936,65 @@ button {
   100% {
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(255, 92, 112, 0);
+  }
+}
+
+@keyframes revealUp {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes softShine {
+  0%,
+  65%,
+  100% {
+    transform: translateX(-115%);
+  }
+  75%,
+  85% {
+    transform: translateX(115%);
+  }
+}
+
+@keyframes floatBlobA {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  50% {
+    transform: translateY(-24px) translateX(20px) scale(1.06);
+  }
+}
+
+@keyframes floatBlobB {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  50% {
+    transform: translateY(22px) translateX(-18px) scale(1.04);
+  }
+}
+
+@keyframes messagePop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
@@ -861,3 +1047,5 @@ button {
     gap: 6px;
   }
 }
+
+

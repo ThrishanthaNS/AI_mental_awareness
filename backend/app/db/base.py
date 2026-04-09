@@ -1,9 +1,7 @@
 """
-Database base model - all models inherit from this.
+Database declarative base.
 """
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import declarative_base
 
 
-class Base(DeclarativeBase):
-    """Base class for all database models."""
-    pass
+Base = declarative_base()

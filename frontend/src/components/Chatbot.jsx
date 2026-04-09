@@ -8,6 +8,7 @@ const Chatbot = ({
   isRecording,
   onStartVideo,
   onStopVideo,
+  onAnalyzeVideo,
   videoActive,
   videoStream,
 }) => {
@@ -97,13 +98,45 @@ const Chatbot = ({
               {msg.mediaType === 'audio' && (
                 <div className="media-message">
                   <span className="media-icon">🎤</span>
-                  <span>Voice message</span>
+                  <span>{msg.transcription?.text ? 'Voice transcribed' : 'Voice message'}</span>
+                </div>
+              )}
+              {msg.transcription && (
+                <div className="video-analysis-card">
+                  <div className="video-analysis-title">Voice to Text</div>
+                  <div className="video-analysis-grid">
+                    <div><strong>Status:</strong> {msg.transcription.status}</div>
+                    <div><strong>Source:</strong> {msg.transcription.source}</div>
+                    <div><strong>Confidence:</strong> {Math.round((msg.transcription.confidence || 0) * 100)}%</div>
+                    <div><strong>Text:</strong> {msg.transcription.text || 'No text captured'}</div>
+                  </div>
+                </div>
+              )}
+              {msg.audioDebug && (
+                <div className="video-analysis-card">
+                  <div className="video-analysis-title">Audio Debug</div>
+                  <div className="video-analysis-grid">
+                    <div><strong>Size:</strong> {msg.audioDebug.audio_size_bytes || 0} bytes</div>
+                    <div><strong>File:</strong> {msg.audioDebug.filename || 'unknown'}</div>
+                    <div><strong>Reason:</strong> {msg.audioDebug.reason || 'n/a'}</div>
+                  </div>
                 </div>
               )}
               {msg.mediaType === 'video' && (
                 <div className="media-message">
                   <span className="media-icon">📹</span>
                   <span>Video message</span>
+                </div>
+              )}
+              {msg.videoAnalysis && (
+                <div className="video-analysis-card">
+                  <div className="video-analysis-title">Facial Analysis</div>
+                  <div className="video-analysis-grid">
+                    <div><strong>Status:</strong> {msg.videoAnalysis.status}</div>
+                    <div><strong>Emotion:</strong> {msg.videoAnalysis.emotion}</div>
+                    <div><strong>Confidence:</strong> {Math.round((msg.videoAnalysis.confidence || 0) * 100)}%</div>
+                    <div><strong>Risk Level:</strong> {msg.videoAnalysis.risk_level}</div>
+                  </div>
                 </div>
               )}
               {(msg.mediaType === 'text' || !msg.mediaType) && <p>{msg.content}</p>}
@@ -164,6 +197,16 @@ const Chatbot = ({
             >
               {videoActive ? '🎥 Active' : '📹'}
             </button>
+
+            {videoActive && (
+              <button
+                onClick={onAnalyzeVideo}
+                className="media-btn analyze-btn"
+                title="Analyze current facial expression"
+              >
+                🧠 Analyze Face
+              </button>
+            )}
 
             {/* Emoji/Mood Button */}
             <button

@@ -42,13 +42,21 @@ export const sendMessage = async (message, mediaType = 'text', mediaData = null,
   return tryApiBases(async (base) => {
     const url = `${base}/chat/message`;
 
-    if (mediaType === 'audio' || mediaType === 'video') {
-      // For audio/video, use FormData
-      const formData = new FormData();
-      formData.append('message', message);
-      formData.append('media_type', mediaType);
-      formData.append('media', mediaData);
-      if (sessionId) formData.append('session_id', String(sessionId));
+  if (mediaType === 'audio' || mediaType === 'video') {
+    // For audio/video, use FormData
+    const formData = new FormData();
+    formData.append('message', message);
+    formData.append('media_type', mediaType);
+    if (mediaData) {
+      if (mediaType === 'audio') {
+        const audioExt = mediaData.type.includes('webm') ? 'webm' : mediaData.type.includes('wav') ? 'wav' : 'ogg';
+        formData.append('media', mediaData, `voice.${audioExt}`);
+      } else {
+        const videoExt = mediaData.type.includes('png') ? 'png' : mediaData.type.includes('jpeg') ? 'jpg' : 'webm';
+        formData.append('media', mediaData, `capture.${videoExt}`);
+      }
+    }
+    if (sessionId) formData.append('session_id', sessionId);
 
       const response = await fetch(url, {
         method: 'POST',

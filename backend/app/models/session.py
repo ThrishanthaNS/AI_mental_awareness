@@ -1,8 +1,7 @@
 """
 Chat session database model.
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float
 from datetime import datetime
 from app.db.base import Base
 
@@ -12,8 +11,7 @@ class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    title = Column(String, nullable=True)  # Optional session title
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -30,13 +28,12 @@ class ChatMessage(Base):
     session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False)
     role = Column(String, nullable=False)  # "user" or "assistant"
     content = Column(Text, nullable=False)
-    
-    # Stress and emotion tracking
-    detected_emotion = Column(String, nullable=True)  # emotion detected by model
-    confidence = Column(Float, nullable=True)  # confidence of emotion detection
-    stress_score = Column(Float, nullable=True)  # 0-100 stress score
-    stress_level = Column(String, nullable=True)  # "low", "moderate", "high"
-    
+    media_type = Column(String, nullable=True)
+    typing_speed = Column(Float, nullable=True)
+    screen_time = Column(Float, nullable=True)
+    sentiment = Column(String, nullable=True)
+    detected_emotion = Column(String, nullable=True)
+    inferred_stress_level = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

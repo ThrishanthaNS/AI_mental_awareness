@@ -83,6 +83,7 @@ class ChatbotService:
         self,
         user_message: str,
         structured_context: dict[str, Any],
+        recent_context: str,
     ) -> str:
         return (
             "You are an intelligent mental well-being assistant.\n\n"
@@ -101,6 +102,8 @@ class ChatbotService:
             f"- Past Stress Scores: {structured_context['history_stress']}\n"
             f"- Past Emotions: {structured_context['history_emotions']}\n"
             f"- Trend: {structured_context['trend_description']}\n\n"
+            "RECENT CONVERSATION (LAST 5 RECORDS):\n"
+            f"{recent_context}\n\n"
             "CURRENT MESSAGE:\n"
             f'"{user_message}"\n\n'
             "-----------------------\n\n"
@@ -124,6 +127,27 @@ class ChatbotService:
             "Response: <natural human response>\n\n"
             "Action: <one simple action>"
         )
+
+    @staticmethod
+    def _format_recent_context(context: list | None, limit: int = 5) -> str:
+        if not context:
+            return "No previous records available."
+
+        recent = context[-limit:]
+        lines: list[str] = []
+        for item in recent:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role") or "unknown").strip().lower()
+            content = str(item.get("content") or "").strip()
+            if not content:
+                continue
+            label = "User" if role == "user" else "Assistant"
+            lines.append(f"- {label}: {content}")
+
+        if not lines:
+            return "No previous records available."
+        return "\n".join(lines)
 
     @staticmethod
     def _parse_structured_output(text: str) -> dict[str, str]:
@@ -404,7 +428,8 @@ class ChatbotService:
 
             client = Groq(api_key=self.settings.GROQ_API_KEY)
             merged_context = self._merge_structured_context(structured_context, sentiment)
-            prompt = self._build_advanced_prompt(user_message, merged_context)
+            recent_context = self._format_recent_context(context, limit=5)
+            prompt = self._build_advanced_prompt(user_message, merged_context, recent_context)
 
             models_to_try = [self.settings.GROQ_MODEL, self.settings.GROQ_FALLBACK_MODEL]
             tried = set()

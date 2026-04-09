@@ -9,54 +9,91 @@ from typing import Any
 from fastapi import APIRouter, File, Form, Request, UploadFile, Depends
 from sqlalchemy.orm import Session
 
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_db
+from app.models.session import ChatMessage, ChatSession
+from app.services.emotion_detection_service import EmotionDetectionService
 from app.services.chatbot_service import ChatbotService
-from app.db.session import get_db
-from app.models.session import ChatSession, ChatMessage
-from app.schemas.chatbot import ChatMessageResponse, ChatMessageDetailedDB
+from app.services.speech_to_text_service import SpeechToTextService
 
 router = APIRouter(prefix="/chat", tags=["Chatbot"])
 
 _chatbot_service = ChatbotService()
+_emotion_detection_service = EmotionDetectionService()
+_speech_to_text_service = SpeechToTextService()
 
 
-def _normalize_stress_level(value: str | None) -> str | None:
-    if not value:
-        return None
-    level = value.strip().lower()
-    if level == "medium":
-        return "moderate"
-    if level in {"low", "moderate", "high"}:
-        return level
-    return None
+def _create_session(db: Session) -> int:
+    session = ChatSession()
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return int(session.id)
 
 
-def _score_from_level(level: str | None) -> float | None:
-    mapping = {"low": 25.0, "moderate": 55.0, "high": 85.0}
-    return mapping.get(level) if level else None
+def _session_exists(db: Session, session_id: int) -> bool:
+    return db.query(ChatSession.id).filter(ChatSession.id == session_id).first() is not None
 
 
-def _safe_iso(dt: datetime | None) -> str | None:
-    return dt.isoformat() if dt else None
+def _add_message(db: Session, session_id: int, payload: dict[str, Any]) -> None:
+    message = ChatMessage(
+        session_id=session_id,
+        role=str(payload.get("role") or "user"),
+        content=str(payload.get("content") or ""),
+        media_type=payload.get("media_type"),
+        typing_speed=payload.get("typing_speed"),
+        screen_time=payload.get("screen_time"),
+        sentiment=payload.get("sentiment"),
+        detected_emotion=payload.get("detected_emotion"),
+        inferred_stress_level=payload.get("inferred_stress_level"),
+    )
+    db.add(message)
+    db.commit()
 
 
-def _build_recommendations(score: float) -> list[str]:
-    if score >= 70:
-        return [
-            "Take a 10-minute break away from the screen now",
-            "Reduce one non-urgent task from today's plan",
-            "Do a short 4-4-6 breathing cycle for 2 minutes",
-        ]
-    if score >= 40:
-        return [
-            "Work in one focused block, then pause for 5 minutes",
-            "Hydrate and do a brief shoulder/neck stretch",
-            "Write your top 2 priorities for the next hour",
-        ]
-    return [
-        "Keep current routines and continue short recovery breaks",
-        "Capture one positive note from today",
-        "Plan one relaxing activity for tonight",
-    ]
+def _serialize_message(message: ChatMessage) -> dict[str, Any]:
+    return {
+        "role": message.role,
+        "content": message.content,
+        "media_type": message.media_type,
+        "typing_speed": message.typing_speed,
+        "screen_time": message.screen_time,
+        "sentiment": message.sentiment,
+        "detected_emotion": message.detected_emotion,
+        "inferred_stress_level": message.inferred_stress_level,
+        "created_at": message.created_at.isoformat() if message.created_at else None,
+    }
+
+
+def _get_session_messages(db: Session, session_id: int) -> list[dict[str, Any]]:
+    rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.id.asc())
+        .all()
+    )
+    return [_serialize_message(row) for row in rows]
+
+
+def _get_last_session_messages(db: Session, session_id: int, limit: int = 5) -> list[dict[str, Any]]:
+    rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [_serialize_message(row) for row in reversed(rows)]
+
+
+def _get_all_sessions(db: Session) -> dict[int, list[dict[str, Any]]]:
+    sessions = db.query(ChatSession).order_by(ChatSession.id.asc()).all()
+    result: dict[int, list[dict[str, Any]]] = {}
+    for session in sessions:
+        result[int(session.id)] = _get_session_messages(db, int(session.id))
+    return result
 
 
 def _to_list(value: Any) -> list[Any]:
@@ -106,6 +143,7 @@ async def send_message(
     history_stress: str | None = Form(default=None),
     history_emotions: str | None = Form(default=None),
     trend_description: str | None = Form(default=None),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Send a message to the mental health chatbot and save to database."""
     payload_message = message
@@ -120,6 +158,9 @@ async def send_message(
     payload_history_stress = history_stress
     payload_history_emotions = history_emotions
     payload_trend_description = trend_description
+    media_content: bytes | None = None
+    video_analysis: dict[str, Any] | None = None
+    transcription_result: dict[str, Any] | None = None
 
     if request.headers.get("content-type", "").startswith("application/json"):
         body = await request.json()
@@ -140,23 +181,45 @@ async def send_message(
     if not payload_message:
         payload_message = "I need support"
 
-    # Create or get chat session
-    if payload_session_id is None:
-        db_session = ChatSession(user_id=user_id, title="Chat Session")
-        db.add(db_session)
-        db.commit()
-        db.refresh(db_session)
-        payload_session_id = db_session.id
-    else:
-        db_session = db.query(ChatSession).filter(ChatSession.id == payload_session_id).first()
-        if not db_session:
-            db_session = ChatSession(user_id=user_id, title="Chat Session")
-            db.add(db_session)
-            db.commit()
-            db.refresh(db_session)
+    if media is not None:
+        media_content = await media.read()
 
-    # Extract history from database
-    session_history_stress, session_history_emotions = _extract_history_from_db(db_session)
+    if payload_media_type == "audio" and media is not None:
+        transcription_result = _speech_to_text_service.transcribe_audio_bytes(
+            media_content or b"",
+            filename=media.filename,
+        )
+        transcribed_text = str(transcription_result.get("text") or "").strip()
+        if transcribed_text:
+            payload_message = transcribed_text
+        elif payload_message in {None, "", "📎 Voice message"}:
+            payload_message = "I sent a voice note but transcription was unavailable."
+
+    if payload_media_type == "video" and media_content:
+        video_analysis = _emotion_detection_service.detect_from_video_bytes(
+            media_content,
+            filename=media.filename,
+        )
+        # Let facial emotion enrich chat context when explicit emotion is not provided.
+        if not payload_emotion:
+            payload_emotion = str(video_analysis.get("emotion") or "neutral")
+        if not payload_sentiment:
+            payload_sentiment = "negative" if str(payload_emotion).lower() in {
+                "sad",
+                "angry",
+                "anxious",
+                "stressed",
+                "overwhelmed",
+                "fear",
+            } else "neutral"
+
+    if payload_session_id is None:
+        payload_session_id = _create_session(db)
+    elif not _session_exists(db, payload_session_id):
+        payload_session_id = _create_session(db)
+
+    existing_messages = _get_session_messages(db, payload_session_id)
+    session_history_stress, session_history_emotions = _extract_history_from_session(existing_messages)
 
     resolved_history_stress = _to_list(payload_history_stress) or session_history_stress
     resolved_history_emotions = _to_list(payload_history_emotions) or session_history_emotions
@@ -173,35 +236,26 @@ async def send_message(
         "trend_description": payload_trend_description,
     }
 
-    # Build message list from database
-    db_messages = [
+    _add_message(
+        db,
+        payload_session_id,
         {
-            "role": msg.role,
-            "content": msg.content,
-            "detected_emotion": msg.detected_emotion,
-            "stress_level": msg.stress_level,
-            "stress_score": msg.stress_score,
-        }
-        for msg in db_session.messages
-    ]
-
-    # Save user message to database
-    user_msg = ChatMessage(
-        session_id=payload_session_id,
-        role="user",
-        content=payload_message,
-        detected_emotion=payload_emotion,
-        confidence=None,
-        stress_score=None,
-        stress_level=None,
+            "role": "user",
+            "content": payload_message,
+            "media_type": payload_media_type,
+            "typing_speed": payload_typing_speed,
+            "screen_time": payload_screen_time,
+            "sentiment": payload_sentiment,
+            "detected_emotion": payload_emotion,
+        },
     )
-    db.add(user_msg)
-    db.commit()
 
-    # Generate response from chatbot service
+    # Keep prompt context focused and fresh: only the latest 5 records.
+    context_messages = _get_last_session_messages(db, payload_session_id, limit=5)
+
     result = _chatbot_service.generate_response(
         payload_message,
-        context=db_messages,
+        context=context_messages,
         media_type=payload_media_type,
         structured_context=structured_context,
     )
@@ -210,33 +264,19 @@ async def send_message(
     confidence = result["confidence"]
     structured = result.get("structured", {})
 
-    stress_level = _normalize_stress_level(result.get("stress_level"))
-    if stress_level is None and isinstance(structured, dict):
-        stress_level = _normalize_stress_level(structured.get("stress_level"))
-
-    stress_score = result.get("stress_score")
-    if stress_score is None:
-        stress_score = _score_from_level(stress_level)
-
-    # Save assistant message to database
-    assistant_msg = ChatMessage(
-        session_id=payload_session_id,
-        role="assistant",
-        content=response_text,
-        detected_emotion=detected_emotion,
-        confidence=confidence,
-        stress_score=stress_score,
-        stress_level=stress_level,
+    _add_message(
+        db,
+        payload_session_id,
+        {
+            "role": "assistant",
+            "content": response_text,
+            "media_type": "text",
+            "detected_emotion": detected_emotion,
+            "inferred_stress_level": structured.get("stress_level"),
+        },
     )
-    db.add(assistant_msg)
-    db.commit()
-    db.refresh(assistant_msg)
 
-    # Consume uploaded media stream when present to avoid dangling handles
-    if media is not None:
-        await media.read()
-
-    return {
+    response_payload = {
         "response": response_text,
         "session_id": payload_session_id,
         "message_id": assistant_msg.id,
@@ -247,6 +287,26 @@ async def send_message(
         "pipeline": result.get("pipeline", {}),
         "structured": structured,
     }
+    if video_analysis is not None:
+        response_payload["video_analysis"] = {
+            "status": video_analysis.get("status", "fallback"),
+            "emotion": video_analysis.get("emotion", "neutral"),
+            "confidence": video_analysis.get("confidence", 0.0),
+            "risk_level": video_analysis.get("risk_level", "low"),
+        }
+    if transcription_result is not None:
+        response_payload["transcription"] = {
+            "status": transcription_result.get("status", "fallback"),
+            "text": str(transcription_result.get("text") or "").strip(),
+            "confidence": transcription_result.get("confidence", 0.0),
+            "source": transcription_result.get("source", "unknown"),
+        }
+        response_payload["audio_debug"] = {
+            "audio_size_bytes": int(transcription_result.get("audio_size_bytes", 0) or 0),
+            "filename": transcription_result.get("filename", media.filename if media else None),
+            "reason": transcription_result.get("reason"),
+        }
+    return response_payload
 
 
 @router.get("/history")
@@ -254,262 +314,7 @@ async def get_chat_history(
     session_id: int | None = None,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    """Retrieve chat history for a session from database."""
+    """Retrieve chat history for the authenticated user."""
     if session_id is None:
-        # Return all sessions with basic info
-        sessions = db.query(ChatSession).all()
-        return {
-            "sessions": [
-                {
-                    "id": s.id,
-                    "title": s.title,
-                    "created_at": s.created_at,
-                    "updated_at": s.updated_at,
-                    "message_count": len(s.messages),
-                }
-                for s in sessions
-            ]
-        }
-    
-    # Get specific session with all messages
-    db_session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
-    
-    if not db_session:
-        return {"error": "Session not found", "session_id": session_id}
-    
-    messages = [
-        {
-            "id": msg.id,
-            "role": msg.role,
-            "content": msg.content,
-            "detected_emotion": msg.detected_emotion,
-            "confidence": msg.confidence,
-            "stress_score": msg.stress_score,
-            "stress_level": msg.stress_level,
-            "created_at": msg.created_at,
-        }
-        for msg in db_session.messages
-    ]
-    
-    return {
-        "session_id": session_id,
-        "title": db_session.title,
-        "created_at": db_session.created_at,
-        "updated_at": db_session.updated_at,
-        "messages": messages,
-    }
-
-
-@router.get("/sessions")
-async def list_chat_sessions(
-    user_id: int = 1,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    """List all chat sessions for a user."""
-    sessions = db.query(ChatSession).filter(ChatSession.user_id == user_id).all()
-    
-    return {
-        "user_id": user_id,
-        "sessions": [
-            {
-                "id": s.id,
-                "title": s.title,
-                "created_at": s.created_at,
-                "updated_at": s.updated_at,
-                "message_count": len(s.messages),
-            }
-            for s in sessions
-        ],
-    }
-
-
-@router.post("/sessions")
-async def create_chat_session(
-    user_id: int,
-    title: str | None = None,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    """Create a new chat session."""
-    session = ChatSession(user_id=user_id, title=title or "New Chat Session")
-    db.add(session)
-    db.commit()
-    db.refresh(session)
-    
-    return {
-        "id": session.id,
-        "user_id": session.user_id,
-        "title": session.title,
-        "created_at": session.created_at,
-        "updated_at": session.updated_at,
-    }
-
-
-@router.delete("/sessions/{session_id}")
-async def delete_chat_session(
-    session_id: int,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    """Delete a chat session and all its messages."""
-    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
-    
-    if not session:
-        return {"error": "Session not found", "session_id": session_id}
-    
-    db.delete(session)
-    db.commit()
-    
-    return {"message": "Session deleted successfully", "session_id": session_id}
-
-
-@router.get("/insights")
-async def get_chat_insights(
-    user_id: int = 1,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    """Compute dashboard insights from persisted chat messages."""
-    sessions = db.query(ChatSession).filter(ChatSession.user_id == user_id).all()
-    if not sessions:
-        return {
-            "user_id": user_id,
-            "current_score": 0.0,
-            "previous_score": 0.0,
-            "risk_level": "low",
-            "trend_data": [0.0],
-            "day_labels": ["Today"],
-            "signals": {
-                "behavioral": {
-                    "activity": "No chat activity yet",
-                    "late_night_activity": "0 late-night messages",
-                },
-                "emotional": {
-                    "dominant_emotion": "neutral",
-                    "high_stress_ratio": "0%",
-                },
-                "contextual": {
-                    "sessions": 0,
-                    "messages": 0,
-                    "user": f"User {user_id}",
-                },
-            },
-            "risk_factors": [
-                {"label": "No recent stress data", "value": "Start a chat to begin tracking", "icon": "ℹ️"}
-            ],
-            "recommendations": _build_recommendations(0.0),
-            "peak_stress_time": "N/A",
-            "intervention_time": "N/A",
-            "burnout_risk": "LOW",
-            "burnout_days": 14,
-        }
-
-    all_messages: list[ChatMessage] = []
-    for session in sessions:
-        all_messages.extend(session.messages)
-
-    assistant_messages = [msg for msg in all_messages if msg.role == "assistant"]
-    user_messages = [msg for msg in all_messages if msg.role == "user"]
-
-    score_points: list[tuple[float, datetime | None]] = []
-    for msg in assistant_messages:
-        score = msg.stress_score
-        if score is None:
-            score = _score_from_level(_normalize_stress_level(msg.stress_level))
-        if score is not None:
-            score_points.append((float(score), msg.created_at))
-
-    if not score_points:
-        score_points = [(0.0, None)]
-
-    latest_points = score_points[-7:]
-    trend_data = [round(score, 2) for score, _ in latest_points]
-    day_labels = [
-        dt.strftime("%a") if dt else "N/A"
-        for _, dt in latest_points
-    ]
-
-    current_score = latest_points[-1][0]
-    previous_score = latest_points[-2][0] if len(latest_points) > 1 else current_score
-
-    if current_score < 40:
-        risk_level = "low"
-    elif current_score < 60:
-        risk_level = "medium"
-    else:
-        risk_level = "high"
-
-    emotion_counter = Counter(
-        (msg.detected_emotion or "neutral").strip().lower()
-        for msg in assistant_messages
-        if isinstance(msg.detected_emotion, str) and msg.detected_emotion.strip()
-    )
-    dominant_emotion = emotion_counter.most_common(1)[0][0] if emotion_counter else "neutral"
-
-    high_count = sum(1 for score, _ in score_points if score >= 70)
-    high_ratio = (high_count / max(len(score_points), 1)) * 100
-
-    late_night_count = sum(
-        1
-        for msg in user_messages
-        if msg.created_at and (msg.created_at.hour >= 22 or msg.created_at.hour <= 5)
-    )
-    activity_last_24h = sum(
-        1
-        for msg in user_messages
-        if msg.created_at and (datetime.utcnow() - msg.created_at).total_seconds() <= 86400
-    )
-
-    peak_item = max(score_points, key=lambda pair: pair[0]) if score_points else (0.0, None)
-    peak_time = peak_item[1]
-    intervention_time = None
-    intervention_window_minutes = 15
-    if peak_time:
-        intervention_time = peak_time - timedelta(minutes=intervention_window_minutes)
-
-    risk_factors: list[dict[str, str]] = []
-    if high_ratio >= 50:
-        risk_factors.append({"label": "Frequent high stress", "value": f"{high_ratio:.0f}% of recent chats", "icon": "📈"})
-
-    trend_delta = current_score - previous_score
-    if trend_delta >= 8:
-        risk_factors.append({"label": "Stress increasing", "value": f"+{trend_delta:.0f} vs previous", "icon": "⚠️"})
-    elif trend_delta <= -8:
-        risk_factors.append({"label": "Stress improving", "value": f"{trend_delta:.0f} vs previous", "icon": "✅"})
-
-    if late_night_count > 0:
-        risk_factors.append({"label": "Late-night activity", "value": f"{late_night_count} late-night chats", "icon": "🌙"})
-
-    if not risk_factors:
-        risk_factors.append({"label": "Balanced recent pattern", "value": "No major risk spike detected", "icon": "🟢"})
-
-    burnout_days = 3 if risk_level == "high" else 7 if risk_level == "medium" else 14
-
-    return {
-        "user_id": user_id,
-        "current_score": round(current_score, 2),
-        "previous_score": round(previous_score, 2),
-        "risk_level": risk_level,
-        "trend_data": trend_data,
-        "day_labels": day_labels,
-        "signals": {
-            "behavioral": {
-                "activity": f"{activity_last_24h} user messages in last 24h",
-                "late_night_activity": f"{late_night_count} late-night messages",
-            },
-            "emotional": {
-                "dominant_emotion": dominant_emotion,
-                "high_stress_ratio": f"{high_ratio:.0f}%",
-            },
-            "contextual": {
-                "sessions": len(sessions),
-                "messages": len(all_messages),
-                "user": f"User {user_id}",
-            },
-        },
-        "risk_factors": risk_factors,
-        "recommendations": _build_recommendations(current_score),
-        "peak_stress_time": peak_time.strftime("%I:%M %p") if peak_time else "N/A",
-        "intervention_time": intervention_time.strftime("%I:%M %p") if intervention_time else "N/A",
-        "intervention_window_minutes": intervention_window_minutes if peak_time else 0,
-        "burnout_risk": risk_level.upper(),
-        "burnout_days": burnout_days,
-        "updated_at": _safe_iso(datetime.utcnow()),
-    }
+        return {"sessions": _get_all_sessions(db)}
+    return {"session_id": session_id, "messages": _get_session_messages(db, session_id)}

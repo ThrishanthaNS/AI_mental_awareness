@@ -110,6 +110,8 @@ docker-compose up --build
 | POST   | `/api/v1/chat/message`       | Chat with AI assistant         |
 | POST   | `/api/v1/detect/text`        | Detect emotion from text       |
 | POST   | `/api/v1/detect/media`       | Detect emotion from media      |
+| POST   | `/api/v1/analyze`            | Stress score and risk analysis |
+| POST   | `/analyze`                   | Direct analyze route for demo  |
 | GET    | `/api/v1/recommendations/`   | Get personalized recommendations |
 
 📖 Full API docs available at `http://localhost:8000/docs` (Swagger UI)

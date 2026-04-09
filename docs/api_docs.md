@@ -120,3 +120,34 @@ Get personalized recommendations.
 
 ### GET `/recommendations/resources`
 Get curated mental health resources.
+
+---
+
+## Stress Analysis
+
+### POST `/analyze`
+Analyze stress risk from behavioral, emotional, and textual signals.
+
+**Request Body:**
+```json
+{
+  "typing_speed": 34,
+  "screen_time": 8.5,
+  "text_input": "I feel exhausted and overwhelmed this week.",
+  "voice_stress": "high",
+  "facial_emotion": "sad"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "stress_score": 78.62,
+  "risk_level": "high",
+  "suggestion": "High stress detected: pause for a 3-minute guided breathing exercise and reach out to a trusted person today."
+}
+```
+
+**Notes:**
+- `voice_stress` and `facial_emotion` are optional simulated multi-modal signals.
+- The same endpoint is available as `/api/v1/analyze`.

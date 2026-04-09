@@ -1,0 +1,2 @@
+# Placeholder for stress model
+# This file will be replaced with a trained model (.pkl)

@@ -22,7 +22,7 @@ const Chat = () => {
   return (
     <div className="chat-page">
       <header>
-        <Link to="/">← Back to Dashboard</Link>
+        <Link className="back-link" to="/">← Back to Dashboard</Link>
         <h1>AI Mental Health Chat</h1>
       </header>
       <Chatbot messages={messages} onSendMessage={handleSendMessage} />

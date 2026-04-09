@@ -1,532 +1,451 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const moodOptions = [
-  'Calm',
-  'Focused',
-  'Gentle',
-  'Wavy',
-  'Stressed',
-];
-
-const stats = [
-  { icon: '◎', value: '12', label: 'Consistency streak' },
-  { icon: '✦', value: '34', label: 'Reflections count' },
-  { icon: '◌', value: '18', label: 'Insights gained' },
-];
-
-const weeklyPatterns = [
-  { day: 'Mon', emotion: 'Stressed', className: 'emotion-stressed' },
-  { day: 'Tue', emotion: 'Calm', className: 'emotion-calm' },
-  { day: 'Wed', emotion: 'Neutral', className: 'emotion-neutral' },
-  { day: 'Thu', emotion: 'Positive', className: 'emotion-positive' },
-  { day: 'Fri', emotion: 'Calm', className: 'emotion-calm' },
-  { day: 'Sat', emotion: 'Positive', className: 'emotion-positive' },
-  { day: 'Sun', emotion: 'Neutral', className: 'emotion-neutral' },
-];
-
-const trendSeries = [
-  { label: 'Mon', value: 32 },
-  { label: 'Tue', value: 44 },
-  { label: 'Wed', value: 39 },
-  { label: 'Thu', value: 57 },
-  { label: 'Fri', value: 64 },
-  { label: 'Sat', value: 70 },
-  { label: 'Sun', value: 63 },
-  { label: 'Mon', value: 72 },
-  { label: 'Tue', value: 80 },
-  { label: 'Wed', value: 76 },
-  { label: 'Thu', value: 84 },
-  { label: 'Fri', value: 88 },
-];
-
-const palette = {
-  positive: [
-    [167, 243, 208],
-    [125, 211, 252],
-    [191, 219, 254],
+// Mock data for demo
+const stressData = {
+  currentScore: 78,
+  previousScore: 76,
+  riskLevel: 'high',
+  trendData: [55, 62, 58, 71, 76, 74, 78],
+  dayLabels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  behaviors: {
+    typingSpeed: { value: 'Slower', change: '↓ 12%' },
+    screenTime: '9 hrs/day',
+  },
+  emotions: {
+    face: 'Fatigue detected',
+    voice: 'Low energy tone',
+  },
+  context: {
+    role: 'Student',
+    workload: 'High',
+    age: 20,
+  },
+  riskFactors: [
+    { label: 'Low sleep', value: '5 hrs', icon: '😴' },
+    { label: 'High screen time', value: '9 hrs/day', icon: '📱' },
+    { label: 'Increased workload', value: '+40% this week', icon: '📊' },
   ],
-  neutral: [
-    [196, 181, 253],
-    [167, 139, 250],
-    [219, 234, 254],
+  recommendations: [
+    'Take a 30-min break within next hour',
+    'Reduce screen exposure tonight',
+    'Reschedule 1 task to next week',
   ],
-  stress: [
-    [251, 207, 232],
-    [253, 186, 116],
-    [252, 231, 243],
-  ],
+  peakStressTime: '10:00 PM',
+  interventionTime: '9:30 PM',
+  burnoutRisk: 'HIGH',
+  burnoutDays: 3,
 };
 
-const toRgba = ([red, green, blue], alpha = 1) => `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+const getRiskColor = (score) => {
+  if (score < 40) return 'low';
+  if (score < 60) return 'medium';
+  return 'high';
+};
 
-function MoodTrendChart() {
+const getRiskIcon = (risk) => {
+  if (risk === 'low') return '●';
+  if (risk === 'medium') return '◐';
+  return '◉';
+};
+
+function TrendChart() {
   const canvasRef = useRef(null);
-  const [hoveredIndex, setHoveredIndex] = useState(0);
 
-  const drawChart = () => {
+  useEffect(() => {
     const canvas = canvasRef.current;
-
-    if (!canvas) {
-      return [];
-    }
+    if (!canvas) return;
 
     const context = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     const { width, height } = canvas.getBoundingClientRect();
-    const displayWidth = Math.max(width, 320);
-    const displayHeight = Math.max(height, 220);
 
-    canvas.width = displayWidth * dpr;
-    canvas.height = displayHeight * dpr;
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    context.clearRect(0, 0, displayWidth, displayHeight);
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    context.scale(dpr, dpr);
+    context.clearRect(0, 0, width, height);
 
-    const paddingX = 28;
-    const paddingY = 24;
-    const innerWidth = displayWidth - paddingX * 2;
-    const innerHeight = displayHeight - paddingY * 2;
-    const min = Math.min(...trendSeries.map((point) => point.value)) - 8;
-    const max = Math.max(...trendSeries.map((point) => point.value)) + 8;
-    const chartPoints = trendSeries.map((point, index) => ({
-      ...point,
-      x: paddingX + (innerWidth / (trendSeries.length - 1)) * index,
-      y: paddingY + innerHeight - ((point.value - min) / (max - min)) * innerHeight,
+    const data = stressData.trendData;
+    const padding = 60;
+    const innerWidth = width - padding * 2;
+    const innerHeight = height - padding * 2 - 30;
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = Math.max(max - min, 1);
+
+    // Grid lines
+    context.strokeStyle = 'rgba(107, 114, 128, 0.1)';
+    context.lineWidth = 1;
+    for (let i = 0; i <= 3; i++) {
+      const y = padding + (innerHeight / 3) * i;
+      context.beginPath();
+      context.moveTo(padding, y);
+      context.lineTo(width - padding, y);
+      context.stroke();
+    }
+
+    // Line chart
+    const points = data.map((value, index) => ({
+      x: padding + (innerWidth / (data.length - 1)) * index,
+      y: padding + innerHeight - ((value - min) / range) * innerHeight,
+      value: value,
     }));
 
-    const gradient = context.createLinearGradient(0, 0, displayWidth, displayHeight);
-    gradient.addColorStop(0, 'rgba(125, 211, 252, 0.92)');
-    gradient.addColorStop(0.5, 'rgba(167, 139, 250, 0.92)');
-    gradient.addColorStop(1, 'rgba(134, 239, 172, 0.9)');
-
-    context.strokeStyle = 'rgba(120, 138, 164, 0.12)';
-    context.lineWidth = 1;
-    for (let index = 0; index < 4; index += 1) {
-      const y = paddingY + (innerHeight / 3) * index;
-      context.beginPath();
-      context.moveTo(paddingX, y);
-      context.lineTo(displayWidth - paddingX, y);
-      context.stroke();
-    }
-
-    const linePath = new Path2D();
-    chartPoints.forEach((point, index) => {
-      if (index === 0) {
-        linePath.moveTo(point.x, point.y);
-      } else {
-        linePath.lineTo(point.x, point.y);
-      }
-    });
+    const gradient = context.createLinearGradient(0, padding, 0, height - padding);
+    gradient.addColorStop(0, 'rgba(239, 68, 68, 0.8)');
+    gradient.addColorStop(1, 'rgba(245, 158, 11, 0.8)');
 
     context.strokeStyle = gradient;
-    context.lineWidth = 4;
+    context.lineWidth = 3;
     context.lineJoin = 'round';
     context.lineCap = 'round';
-    context.stroke(linePath);
+    context.beginPath();
+    points.forEach((point, index) => {
+      if (index === 0) context.moveTo(point.x, point.y);
+      else context.lineTo(point.x, point.y);
+    });
+    context.stroke();
 
-    const areaPath = new Path2D(linePath);
-    areaPath.lineTo(chartPoints[chartPoints.length - 1].x, displayHeight - paddingY);
-    areaPath.lineTo(chartPoints[0].x, displayHeight - paddingY);
-    areaPath.closePath();
-
-    const areaGradient = context.createLinearGradient(0, paddingY, 0, displayHeight - paddingY);
-    areaGradient.addColorStop(0, 'rgba(167, 139, 250, 0.24)');
-    areaGradient.addColorStop(1, 'rgba(255, 255, 255, 0.04)');
+    // Fill area
+    const areaGradient = context.createLinearGradient(0, padding, 0, height - padding);
+    areaGradient.addColorStop(0, 'rgba(239, 68, 68, 0.2)');
+    areaGradient.addColorStop(1, 'rgba(239, 68, 68, 0.02)');
     context.fillStyle = areaGradient;
-    context.fill(areaPath);
+    context.lineTo(points[points.length - 1].x, height - padding - 30);
+    context.lineTo(points[0].x, height - padding - 30);
+    context.closePath();
+    context.fill();
 
-    chartPoints.forEach((point, index) => {
+    // Data points with values
+    points.forEach((point, index) => {
+      // Point circle
       context.beginPath();
-      context.arc(point.x, point.y, index === hoveredIndex ? 8 : 6, 0, Math.PI * 2);
-      context.fillStyle = '#ffffff';
+      context.arc(point.x, point.y, 5, 0, Math.PI * 2);
+      context.fillStyle = index === points.length - 1 ? '#ef4444' : '#ffffff';
       context.fill();
-      context.lineWidth = 4;
       context.strokeStyle = gradient;
+      context.lineWidth = 2;
       context.stroke();
+
+      // Value label
+      context.fillStyle = '#e4e9f1';
+      context.font = 'bold 12px Inter, system-ui';
+      context.textAlign = 'center';
+      context.fillText(point.value.toString(), point.x, point.y - 15);
     });
 
-    return chartPoints;
-  };
-
-  const chartPointsRef = useRef([]);
-
-  useEffect(() => {
-    const render = () => {
-      chartPointsRef.current = drawChart();
-    };
-
-    render();
-
-    const handleResize = () => render();
-    window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, [hoveredIndex]);
-
-  const handlePointerMove = (event) => {
-    const canvas = canvasRef.current;
-
-    if (!canvas || chartPointsRef.current.length === 0) {
-      return;
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const cursorX = event.clientX - rect.left;
-    const cursorY = event.clientY - rect.top;
-
-    let nearestIndex = 0;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-
-    chartPointsRef.current.forEach((point, index) => {
-      const distance = Math.hypot(point.x - cursorX, point.y - cursorY);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestIndex = index;
-      }
+    // Day labels
+    points.forEach((point, index) => {
+      context.fillStyle = 'rgba(168, 179, 193, 0.7)';
+      context.font = '12px Inter, system-ui';
+      context.textAlign = 'center';
+      const dayLabel = stressData.dayLabels[index];
+      context.fillText(dayLabel, point.x, height - padding + 15);
     });
+  }, []);
 
-    if (nearestDistance < 44) {
-      setHoveredIndex(nearestIndex);
-    }
+  return <canvas ref={canvasRef} className="trend-chart" aria-label="7-day stress trend chart" />;
+}
+
+function Dashboard() {
+  const riskClass = getRiskColor(stressData.currentScore);
+  const [completedRecs, setCompletedRecs] = useState([]);
+  const [expandedSignals, setExpandedSignals] = useState({
+    behavioral: false,
+    emotional: false,
+    context: false,
+  });
+
+  const toggleSignal = (type) => {
+    setExpandedSignals((prev) => ({
+      ...prev,
+      [type]: !prev[type],
+    }));
   };
 
-  const hoveredPoint = chartPointsRef.current[hoveredIndex];
+  const toggleRecommendation = (index) => {
+    setCompletedRecs((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+    );
+  };
+
+  const dismissRecommendation = (index, e) => {
+    e.stopPropagation();
+    setCompletedRecs((prev) => [...prev, index]);
+  };
+
+  const visibleRecs = stressData.recommendations.filter(
+    (_, index) => !completedRecs.includes(index)
+  );
+
+  const scoreChange = stressData.currentScore - stressData.previousScore;
+  const changeDirection = scoreChange > 0 ? '↑' : scoreChange < 0 ? '↓' : '→';
+  const changeColor = scoreChange > 0 ? '#ef4444' : scoreChange < 0 ? '#10b981' : '#a8b3c1';
 
   return (
-    <div className="trend-chart-shell">
-      <canvas
-        ref={canvasRef}
-        aria-label="Mood trend line chart"
-        onMouseMove={handlePointerMove}
-        onFocus={() => setHoveredIndex(hoveredIndex)}
-      />
-      {hoveredPoint && (
-        <div className="trend-tooltip" style={{ left: `calc(${hoveredPoint.x}px + 6px)`, top: `calc(${hoveredPoint.y}px - 12px)` }}>
-          <strong>{hoveredPoint.label}</strong>
-          <span>{hoveredPoint.value}% mood energy</span>
+    <div className="dashboard-page">
+      {/* Navbar */}
+      <nav className="navbar">
+        <div className="brand-block">
+          <div className="brand-mark">M</div>
+          <h1 className="brand-copy">MindGuard</h1>
         </div>
-      )}
+        <div className="navbar-right">
+          <span className="role-badge">👤 {stressData.context.role}</span>
+          <div className="user-icon">U</div>
+        </div>
+      </nav>
+
+      {/* Main content */}
+      <main className="dashboard-shell">
+        {/* Hero Card */}
+        <div className="hero-card">
+          <div className="stress-score">
+            <div className={`stress-number ${riskClass}`}>{stressData.currentScore}</div>
+            <div className="stress-label">/ 100 Stress Score</div>
+            <div style={{ fontSize: '0.85rem', marginTop: '8px', color: changeColor }}>
+              {changeDirection} {Math.abs(scoreChange)} vs yesterday
+            </div>
+          </div>
+          <div className="stress-meta">
+            <div className={`risk-badge ${riskClass}`}>
+              {getRiskIcon(riskClass)} {riskClass.toUpperCase()}
+            </div>
+            <div className="risk-description">Stress level elevated</div>
+            <div
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--ink-soft)',
+                marginTop: '8px',
+                paddingTop: '8px',
+                borderTop: '1px solid rgba(148, 163, 184, 0.1)',
+              }}
+            >
+              ⚡ Immediate attention needed
+            </div>
+          </div>
+        </div>
+
+        {/* Trend Section */}
+        <div className="card">
+          <h2 className="card-title">📊 Stress Trend (Last 7 Days)</h2>
+          <TrendChart />
+          <div className="trend-meta">
+            <span>Mon → Sun</span>
+            <span className="trend-increase">↑ 35% increase this week</span>
+          </div>
+          <div className="trend-comparison">
+            Peak on Sunday (78 pts) • Lowest on Monday (55 pts) • Avg this week: 67 pts
+          </div>
+        </div>
+
+        {/* Multi-Modal Signals */}
+        <div className="card">
+          <h2 className="card-title">🧩 Multi-Modal Signals</h2>
+          <div className="signals-grid">
+            {/* Behavioral */}
+            <div className={`signal-card behavioral ${expandedSignals.behavioral ? 'expanded' : ''}`}>
+              <button
+                className="signal-title expandable-toggle"
+                onClick={() => toggleSignal('behavioral')}
+                aria-expanded={expandedSignals.behavioral}
+              >
+                <span>🟦 Behavioral</span>
+                <span className={`expandable-icon ${expandedSignals.behavioral ? 'open' : ''}`}>▼</span>
+              </button>
+              {expandedSignals.behavioral && (
+                <div className="signal-details">
+                  <div className="signal-item">
+                    <span className="signal-label">Typing Speed</span>
+                    <span className="signal-value">{stressData.behaviors.typingSpeed.change}</span>
+                  </div>
+                  <div className="signal-item">
+                    <span className="signal-label">Screen Time</span>
+                    <span className="signal-value">{stressData.behaviors.screenTime}</span>
+                  </div>
+                </div>
+              )}
+              {!expandedSignals.behavioral && (
+                <div className="signal-item">
+                  <span className="signal-label">Activity</span>
+                  <span className="signal-value">2 signals detected</span>
+                </div>
+              )}
+            </div>
+
+            {/* Emotional */}
+            <div className={`signal-card emotional ${expandedSignals.emotional ? 'expanded' : ''}`}>
+              <button
+                className="signal-title expandable-toggle"
+                onClick={() => toggleSignal('emotional')}
+                aria-expanded={expandedSignals.emotional}
+              >
+                <span>🟪 Emotional</span>
+                <span className={`expandable-icon ${expandedSignals.emotional ? 'open' : ''}`}>▼</span>
+              </button>
+              {expandedSignals.emotional && (
+                <div className="signal-details">
+                  <div className="signal-item">
+                    <span className="signal-label">Face</span>
+                    <span className="signal-value">{stressData.emotions.face}</span>
+                  </div>
+                  <div className="signal-item">
+                    <span className="signal-label">Voice</span>
+                    <span className="signal-value">{stressData.emotions.voice}</span>
+                  </div>
+                </div>
+              )}
+              {!expandedSignals.emotional && (
+                <div className="signal-item">
+                  <span className="signal-label">Status</span>
+                  <span className="signal-value">2 indicators</span>
+                </div>
+              )}
+            </div>
+
+            {/* Contextual */}
+            <div className={`signal-card context ${expandedSignals.context ? 'expanded' : ''}`}>
+              <button
+                className="signal-title expandable-toggle"
+                onClick={() => toggleSignal('context')}
+                aria-expanded={expandedSignals.context}
+              >
+                <span>🟩 Contextual</span>
+                <span className={`expandable-icon ${expandedSignals.context ? 'open' : ''}`}>▼</span>
+              </button>
+              {expandedSignals.context && (
+                <div className="signal-details">
+                  <div className="signal-item">
+                    <span className="signal-label">Role</span>
+                    <span className="signal-value">{stressData.context.role}</span>
+                  </div>
+                  <div className="signal-item">
+                    <span className="signal-label">Workload</span>
+                    <span className="signal-value">{stressData.context.workload}</span>
+                  </div>
+                  <div className="signal-item">
+                    <span className="signal-label">Age</span>
+                    <span className="signal-value">{stressData.context.age}</span>
+                  </div>
+                </div>
+              )}
+              {!expandedSignals.context && (
+                <div className="signal-item">
+                  <span className="signal-label">Context</span>
+                  <span className="signal-value">3 factors</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Risk & Recommendations (2-column) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+          {/* Risk Factors */}
+          <div className="card">
+            <h2 className="card-title">⚠️ Why are you stressed?</h2>
+            <div className="risk-factors">
+              {stressData.riskFactors.map((factor) => (
+                <div key={factor.label} className="risk-item">
+                  <span className="risk-indicator">{factor.icon}</span>
+                  <div className="risk-text">
+                    <strong>{factor.label}</strong>
+                    <div>{factor.value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recommendations */}
+          <div className="card">
+            <h2 className="card-title">⚡ Recommended Actions</h2>
+            <div className="recommendations">
+              {visibleRecs.map((rec, index) => (
+                <div
+                  key={index}
+                  className={`recommendation-item ${completedRecs.includes(index) ? 'done' : ''}`}
+                  onClick={() => toggleRecommendation(index)}
+                  role="button"
+                  tabIndex="0"
+                  aria-pressed={completedRecs.includes(index)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') toggleRecommendation(index);
+                  }}
+                >
+                  <span className="recommendation-icon">✓</span>
+                  <div className="recommendation-text">{rec}</div>
+                  <button
+                    className="recommendation-close"
+                    onClick={(e) => dismissRecommendation(index, e)}
+                    aria-label="Dismiss recommendation"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {visibleRecs.length === 0 && (
+                <div style={{ padding: '12px', color: 'var(--ink-soft)', fontSize: '0.9rem' }}>
+                  ✨ All recommendations marked! Great job!
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Intervention Timing */}
+        <div className="intervention-card">
+          <div className="intervention-title">⏱️ Intervention Timing</div>
+          <div>
+            <div className="intervention-time">{stressData.interventionTime}</div>
+            <div className="intervention-meta">
+              Peak stress expected at {stressData.peakStressTime} | Recommended action window: 15 min before
+            </div>
+          </div>
+        </div>
+
+        {/* Burnout Prediction */}
+        <div className="burnout-card">
+          <div className="burnout-status">
+            <div className="burnout-indicator" />
+            <div className="burnout-risk-text">Burnout Risk: 🔴 {stressData.burnoutRisk}</div>
+          </div>
+          <div className="burnout-description">
+            Burnout likely in{' '}
+            <strong>
+              {stressData.burnoutDays} day{stressData.burnoutDays !== 1 ? 's' : ''}
+            </strong>{' '}
+            if pattern continues. Consider intervention or lifestyle changes.
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="card" style={{ textAlign: 'center', padding: '32px' }}>
+          <h2 className="card-title">Get Personal Support</h2>
+          <p style={{ margin: '8px 0 16px', color: 'var(--ink-soft)' }}>
+            Chat with our AI wellness assistant for immediate guidance
+          </p>
+          <Link to="/chat" style={{ display: 'inline-block' }}>
+            <button
+              style={{
+                padding: '12px 28px',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))',
+                color: 'white',
+                fontWeight: '600',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+              }}
+            >
+              Open Chat
+            </button>
+          </Link>
+        </div>
+      </main>
     </div>
   );
 }
-
-function MoodVisualizer({ mode, moodTone }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-
-    if (!canvas) {
-      return undefined;
-    }
-
-    const context = canvas.getContext('2d');
-    let animationFrameId;
-
-    const render = (frame) => {
-      const dpr = window.devicePixelRatio || 1;
-      const { width, height } = canvas.getBoundingClientRect();
-      const displayWidth = Math.max(width, 400);
-      const displayHeight = Math.max(height, 400);
-
-      canvas.width = displayWidth * dpr;
-      canvas.height = displayHeight * dpr;
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
-      context.clearRect(0, 0, displayWidth, displayHeight);
-
-      const time = frame / 60;
-      const centerX = displayWidth / 2;
-      const centerY = displayHeight / 2;
-      const colors = palette[moodTone] || palette.neutral;
-
-      const background = context.createRadialGradient(centerX, centerY, 20, centerX, centerY, Math.max(displayWidth, displayHeight));
-      background.addColorStop(0, 'rgba(255, 255, 255, 0.68)');
-      background.addColorStop(0.45, 'rgba(255, 255, 255, 0.16)');
-      background.addColorStop(1, 'rgba(255, 255, 255, 0.04)');
-      context.fillStyle = background;
-      context.fillRect(0, 0, displayWidth, displayHeight);
-
-      if (mode === 'mandala') {
-        for (let ring = 0; ring < 6; ring += 1) {
-          const radius = 52 + ring * 30 + Math.sin(time + ring * 0.5) * 8;
-          context.beginPath();
-          context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-          context.strokeStyle = toRgba(colors[ring % colors.length], 0.86);
-          context.lineWidth = 8 - ring * 0.7;
-          context.stroke();
-        }
-      } else if (mode === 'particles') {
-        for (let particle = 0; particle < 54; particle += 1) {
-          const angle = (particle / 54) * Math.PI * 2 + time * 0.18;
-          const orbit = 68 + (particle % 7) * 10;
-          const x = centerX + Math.cos(angle) * orbit + Math.sin(time + particle * 0.2) * 8;
-          const y = centerY + Math.sin(angle) * orbit + Math.cos(time + particle * 0.3) * 8;
-          const alpha = 0.3 + (particle % 6) * 0.08;
-          context.beginPath();
-          context.arc(x, y, 4 + (particle % 3), 0, Math.PI * 2);
-          context.fillStyle = toRgba(colors[particle % colors.length], alpha);
-          context.fill();
-        }
-      } else {
-        for (let blob = 0; blob < 8; blob += 1) {
-          const x = centerX + Math.cos(time * 0.85 + blob) * (54 + blob * 12);
-          const y = centerY + Math.sin(time * 0.78 + blob * 1.15) * (42 + blob * 9);
-          const size = 26 + blob * 10 + Math.sin(time + blob) * 7;
-          const gradient = context.createRadialGradient(x, y, 8, x, y, size);
-          gradient.addColorStop(0, toRgba(colors[blob % colors.length], 0.95));
-          gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-          context.fillStyle = gradient;
-          context.beginPath();
-          context.arc(x, y, size, 0, Math.PI * 2);
-          context.fill();
-        }
-      }
-
-      animationFrameId = window.requestAnimationFrame(render);
-    };
-
-    animationFrameId = window.requestAnimationFrame(render);
-    const handleResize = () => {
-      window.cancelAnimationFrame(animationFrameId);
-      animationFrameId = window.requestAnimationFrame(render);
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [mode, moodTone]);
-
-  return <canvas ref={canvasRef} aria-hidden="true" />;
-}
-
-function VoiceRecorder() {
-  const [recording, setRecording] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-
-  useEffect(() => {
-    if (!recording) {
-      return undefined;
-    }
-
-    const timerId = window.setInterval(() => {
-      setSeconds((value) => value + 1);
-    }, 1000);
-
-    return () => window.clearInterval(timerId);
-  }, [recording]);
-
-  const toggleRecording = () => {
-    if (recording) {
-      setRecording(false);
-      window.setTimeout(() => setSeconds(0), 400);
-      return;
-    }
-
-    setSeconds(0);
-    setRecording(true);
-  };
-
-  return (
-    <section className="voice-panel panel fade-in delay-2">
-      <div className="voice-cta">
-        <h2 className="voice-title">Voice recording</h2>
-        <button className={`mic-button ${recording ? 'recording' : ''}`} onClick={toggleRecording} aria-label="Toggle voice recording">
-          {recording ? '◉' : '🎙'}
-        </button>
-        <p className="voice-note">Speak for 10-30 seconds about how you're feeling.</p>
-      </div>
-
-      {recording ? (
-        <>
-          <div className="waveform" aria-hidden="true">
-            {Array.from({ length: 12 }).map((_, index) => (
-              <span key={index} className="wave-bar" style={{ animationDelay: `${index * 90}ms`, height: `${18 + (index % 4) * 12}px` }} />
-            ))}
-          </div>
-          <div className="voice-state">
-            <span className="timer">Recording for {seconds} seconds</span>
-            <button className="stop-button" onClick={toggleRecording}>
-              Stop
-            </button>
-          </div>
-          <div className="analysis-pill">
-            <span className="spinner" aria-hidden="true" />
-            Visual and voice analysis in progress
-          </div>
-        </>
-      ) : (
-        <div className="voice-state">
-          <span className="timer">Ready to start recording</span>
-          <button className="start-button" onClick={toggleRecording}>
-            Start
-          </button>
-        </div>
-      )}
-    </section>
-  );
-}
-
-const Dashboard = () => {
-  const [mood, setMood] = useState('Calm');
-  const [visualizerMode, setVisualizerMode] = useState('abstract');
-
-  const moodTone = useMemo(() => {
-    if (mood === 'Stressed') {
-      return 'stress';
-    }
-
-    if (mood === 'Focused' || mood === 'Wavy') {
-      return 'neutral';
-    }
-
-    return 'positive';
-  }, [mood]);
-
-  const message = mood === 'Stressed' ? 'You are moving through a demanding moment with care.' : "You're doing great today.";
-
-  return (
-    <main className="dashboard-page">
-      <header className="dashboard-header fade-in">
-        <div className="brand-block">
-          <div className="brand-mark">M</div>
-          <div className="brand-copy">
-            <h1>MindFlow</h1>
-            <p>Calm space for reflection and recovery</p>
-          </div>
-        </div>
-
-        <div className="header-stats">
-          <span className="status-pill">User status: steady</span>
-          <span className="streak-pill">Streak 12 days</span>
-          <button className="bell-button" aria-label="Notifications">
-            ◌
-          </button>
-        </div>
-      </header>
-
-      <section className="dashboard-shell">
-        <div className="section-intro fade-in delay-1">
-          <p className="section-kicker">Daily check-in</p>
-          <h2 className="section-title">A softer way to understand your day</h2>
-        </div>
-
-        <div className="dashboard-grid">
-          <section className="mood-panel panel fade-in delay-1">
-            <h3 className="panel-title">Mood</h3>
-            <div className="mood-core">
-              <div className="mood-ring">
-                <div className="mood-circle">
-                  <div>
-                    <h3>{mood}</h3>
-                    <p>{message}</p>
-                  </div>
-                </div>
-              </div>
-
-              <p className="mood-message">Tap a feeling to update the center state.</p>
-
-              <div className="mood-selector" role="list" aria-label="Mood selector">
-                {moodOptions.map((option) => (
-                  <button
-                    key={option}
-                    className={`mood-chip ${mood === option ? 'active' : ''}`}
-                    onClick={() => setMood(option)}
-                    role="listitem"
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="trend-panel panel fade-in delay-2">
-            <h3 className="trend-title">Mood trends</h3>
-            <MoodTrendChart />
-            <div className="trend-meta">
-              <span>Past 12 sessions</span>
-              <span>Hover to inspect daily changes</span>
-            </div>
-          </section>
-
-          <section className="stats-stack">
-            {stats.map((item, index) => (
-              <article key={item.label} className={`stats-card fade-in delay-${Math.min(index + 1, 3)}`}>
-                <div className="stats-icon">{item.icon}</div>
-                <p className="stats-value">{item.value}</p>
-                <p className="stats-label">{item.label}</p>
-              </article>
-            ))}
-          </section>
-
-          <section className="visualizer-panel panel fade-in delay-2">
-            <div className="insight-head">
-              <h3 className="visualizer-title">Mood visualizer</h3>
-              <span className="caption">No text overlays</span>
-            </div>
-            <div className="visualizer-stage">
-              <MoodVisualizer mode={visualizerMode} moodTone={moodTone} />
-            </div>
-            <div className="visualizer-controls" aria-label="Visualization modes">
-              <button className={`mode-button ${visualizerMode === 'abstract' ? 'active' : ''}`} onClick={() => setVisualizerMode('abstract')}>
-                Abstract
-              </button>
-              <button className={`mode-button ${visualizerMode === 'mandala' ? 'active' : ''}`} onClick={() => setVisualizerMode('mandala')}>
-                Mandala
-              </button>
-              <button className={`mode-button ${visualizerMode === 'particles' ? 'active' : ''}`} onClick={() => setVisualizerMode('particles')}>
-                Particles
-              </button>
-            </div>
-          </section>
-
-          <VoiceRecorder />
-
-          <section className="patterns-panel panel fade-in delay-3" id="patterns">
-            <h3 className="patterns-title">Pattern recognition</h3>
-            <article className="insight-card">
-              <div className="insight-head">
-                <div>
-                  <div className="insight-icon">✦</div>
-                  <strong>You tend to feel most stressed on Monday mornings.</strong>
-                </div>
-                <span className="caption">Weekly view</span>
-              </div>
-
-              <div className="progress-track" aria-hidden="true">
-                <div className="progress-fill" style={{ width: '72%' }} />
-              </div>
-
-              <p className="insight-copy">Your recovery patterns improve after brief check-ins and lighter evening reflections.</p>
-            </article>
-
-            <div className="patterns-grid">
-              <div className="pattern-week" aria-label="Weekly emotion patterns">
-                {weeklyPatterns.map((day) => (
-                  <div className="day-chip" key={day.day}>
-                    <strong>{day.day}</strong>
-                    <div className={`emotion-tag ${day.className}`} aria-hidden="true" />
-                    <span>{day.emotion}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="panel fade-in delay-3">
-            <h3 className="patterns-title">Need a deeper check-in?</h3>
-            <p className="support-note">Open the chat to reflect with the AI companion in a calmer, more guided flow.</p>
-            <Link className="start-button" to="/chat">
-              Open chat
-            </Link>
-          </section>
-        </div>
-      </section>
-    </main>
-  );
-};
 
 export default Dashboard;

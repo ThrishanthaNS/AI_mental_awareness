@@ -114,3 +114,5 @@ data/logs/*
 
 # Build
 frontend/dist/
+
+.env

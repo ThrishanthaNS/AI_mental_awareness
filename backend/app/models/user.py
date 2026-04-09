@@ -2,10 +2,12 @@
 User database model.
 """
 from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.db.base import Base
 
 
-class User:
+class User(Base):
     """User model for storing user account information."""
     __tablename__ = "users"
 
@@ -15,3 +17,7 @@ class User:
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    chat_sessions = relationship("ChatSession", back_populates="user")
+    mood_entries = relationship("MoodEntry", back_populates="user")

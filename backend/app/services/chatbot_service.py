@@ -107,6 +107,7 @@ class ChatbotService:
             "TASK:\n\n"
             "1. Infer:\n"
             "   - Stress Level (Low / Medium / High)\n"
+            "   - Stress Score (0-100)\n"
             "   - Emotional State (1-2 words)\n\n"
             "2. Reason:\n"
             "   - Briefly explain why the user is in this state (based on signals + history)\n\n"
@@ -117,6 +118,7 @@ class ChatbotService:
             "-----------------------\n\n"
             "OUTPUT FORMAT (STRICT):\n\n"
             "Stress Level: <Low/Medium/High>\n"
+            "Stress Score: <0-100>\n"
             "Emotion: <emotion>\n\n"
             "Reason: <1 short line>\n\n"
             "Response: <natural human response>\n\n"
@@ -128,6 +130,7 @@ class ChatbotService:
         parsed: dict[str, str] = {}
         patterns = {
             "stress_level": r"Stress\s*Level\s*:\s*(.*?)(?=\s*Emotion\s*:|\s*Reason\s*:|\s*Response\s*:|\s*Action\s*:|$)",
+            "stress_score": r"Stress\s*Score\s*:\s*(.*?)(?=\s*Emotion\s*:|\s*Reason\s*:|\s*Response\s*:|\s*Action\s*:|$)",
             "emotion": r"Emotion\s*:\s*(.*?)(?=\s*Reason\s*:|\s*Response\s*:|\s*Action\s*:|$)",
             "reason": r"Reason\s*:\s*(.*?)(?=\s*Response\s*:|\s*Action\s*:|$)",
             "response": r"Response\s*:\s*(.*?)(?=\s*Action\s*:|$)",
@@ -143,11 +146,114 @@ class ChatbotService:
     def _format_structured_output(parsed: dict[str, str]) -> str:
         return (
             f"Stress Level: {parsed.get('stress_level', 'Medium')}\n"
+            f"Stress Score: {parsed.get('stress_score', '55')}\n"
             f"Emotion: {parsed.get('emotion', 'neutral')}\n\n"
             f"Reason: {parsed.get('reason', 'Multiple signals indicate moderate strain.')}\n\n"
             f"Response: {parsed.get('response', 'You are handling a lot, and your feelings make sense.')}\n\n"
             f"Action: {parsed.get('action', 'Take 3 slow breaths and list one next task to do now.')}"
         )
+
+    @staticmethod
+    def _stress_level_from_score(score: float) -> str:
+        if score >= 70:
+            return "High"
+        if score >= 40:
+            return "Medium"
+        return "Low"
+
+    @staticmethod
+    def _normalize_score(value: Any) -> float | None:
+        try:
+            if isinstance(value, str):
+                value = value.replace("%", "").strip()
+            num = float(value)
+            return max(0.0, min(100.0, num))
+        except (TypeError, ValueError):
+            return None
+
+    def _compute_intelligent_stress_score(
+        self,
+        user_message: str,
+        merged_context: dict[str, Any],
+        sentiment: dict[str, Any],
+        parsed: dict[str, str] | None = None,
+    ) -> float:
+        score = 50.0
+        text = user_message.lower()
+
+        # Sentiment + confidence are primary drivers.
+        sentiment_label = str(merged_context.get("sentiment") or sentiment.get("sentiment", "neutral")).lower()
+        confidence = float(sentiment.get("confidence", 0.65))
+        if sentiment_label == "negative":
+            score += 28.0 * confidence
+        elif sentiment_label == "positive":
+            score -= 24.0 * confidence
+
+        severe_terms = {
+            "panic", "overwhelmed", "breakdown", "burnout", "can't cope", "cannot cope", "hopeless"
+        }
+        moderate_terms = {
+            "stressed", "stress", "anxious", "worried", "tired", "pressure", "deadline", "exhausted"
+        }
+        calming_terms = {"calm", "better", "relaxed", "good", "okay", "fine", "managed"}
+
+        score += 15.0 * sum(1 for t in severe_terms if t in text)
+        score += 8.0 * sum(1 for t in moderate_terms if t in text)
+        score -= 6.0 * sum(1 for t in calming_terms if t in text)
+
+        # Behavioral/context signals when provided.
+        try:
+            typing_speed = float(merged_context.get("typing_speed"))
+            if typing_speed < 30:
+                score += 8
+            elif typing_speed > 75:
+                score += 4
+            elif typing_speed > 50:
+                score -= 3
+        except (TypeError, ValueError):
+            pass
+
+        try:
+            screen_time = float(merged_context.get("screen_time"))
+            if screen_time > 10:
+                score += 14
+            elif screen_time > 7:
+                score += 8
+            elif screen_time < 3:
+                score -= 5
+        except (TypeError, ValueError):
+            pass
+
+        history = merged_context.get("history_stress") or []
+        if isinstance(history, list):
+            numeric_history: list[float] = []
+            for val in history:
+                try:
+                    numeric_history.append(float(val))
+                except (TypeError, ValueError):
+                    continue
+            if numeric_history:
+                history_avg = sum(numeric_history[-5:]) / min(len(numeric_history), 5)
+                score = 0.75 * score + 0.25 * history_avg
+
+        trend = str(merged_context.get("trend_description", "")).lower()
+        if "increasing" in trend or "wors" in trend:
+            score += 8
+        elif "improving" in trend:
+            score -= 8
+
+        # Blend model-declared level/score when present.
+        parsed = parsed or {}
+        parsed_score = self._normalize_score(parsed.get("stress_score"))
+        if parsed_score is not None:
+            score = 0.65 * score + 0.35 * parsed_score
+
+        parsed_level = str(parsed.get("stress_level", "")).strip().lower()
+        if parsed_level in {"low", "medium", "high"}:
+            target = {"low": 25.0, "medium": 55.0, "high": 82.0}[parsed_level]
+            score = 0.8 * score + 0.2 * target
+
+        return round(max(0.0, min(100.0, score)), 2)
 
     @staticmethod
     def _fallback_structured_output(
@@ -217,6 +323,7 @@ class ChatbotService:
 
         parsed = {
             "stress_level": stress_level,
+            "stress_score": f"{round(score, 2)}",
             "emotion": emotion_text,
             "reason": reason,
             "response": response,
@@ -341,6 +448,7 @@ class ChatbotService:
     ) -> dict:
         """Generate a supportive response using model-first, fallback-safe logic."""
         sentiment = self.sentiment_service.analyze(user_message)
+        merged_context = self._merge_structured_context(structured_context, sentiment)
 
         if self.detect_crisis(user_message):
             crisis_prompt = (
@@ -362,10 +470,16 @@ class ChatbotService:
                     if parsed_crisis
                     else crisis_response
                 )
+                crisis_score = max(
+                    90.0,
+                    self._compute_intelligent_stress_score(user_message, merged_context, sentiment, parsed_crisis),
+                )
                 return {
                     "response": normalized_crisis,
                     "detected_emotion": parsed_crisis.get("emotion", "crisis_risk"),
                     "confidence": 0.95,
+                    "stress_score": crisis_score,
+                    "stress_level": "high",
                     "pipeline": {
                         "sentiment_model": sentiment.get("source", "unknown"),
                         "groq_chat": True,
@@ -375,12 +489,19 @@ class ChatbotService:
                     "structured": parsed_crisis,
                 }
 
-            merged_context = self._merge_structured_context(structured_context, sentiment)
             fallback_text, fallback_structured = self._fallback_structured_output(user_message, merged_context, sentiment)
+            fallback_score = self._compute_intelligent_stress_score(
+                user_message,
+                merged_context,
+                sentiment,
+                fallback_structured,
+            )
             return {
                 "response": fallback_text,
                 "detected_emotion": fallback_structured.get("emotion", "crisis_risk"),
                 "confidence": 0.95,
+                "stress_score": fallback_score,
+                "stress_level": self._stress_level_from_score(fallback_score).lower(),
                 "pipeline": {
                     "sentiment_model": sentiment.get("source", "unknown"),
                     "groq_chat": False,
@@ -399,6 +520,9 @@ class ChatbotService:
         )
         if llm_response:
             parsed = self._parse_structured_output(llm_response)
+            intelligent_score = self._compute_intelligent_stress_score(user_message, merged_context, sentiment, parsed)
+            parsed["stress_score"] = str(intelligent_score)
+            parsed["stress_level"] = self._stress_level_from_score(intelligent_score)
             normalized_response = (
                 self._format_structured_output(parsed)
                 if parsed
@@ -408,6 +532,8 @@ class ChatbotService:
                 "response": normalized_response,
                 "detected_emotion": parsed.get("emotion", "neutral"),
                 "confidence": sentiment.get("confidence", 0.75),
+                "stress_score": intelligent_score,
+                "stress_level": self._stress_level_from_score(intelligent_score).lower(),
                 "pipeline": {
                     "sentiment_model": sentiment.get("source", "unknown"),
                     "groq_chat": True,
@@ -417,14 +543,18 @@ class ChatbotService:
                 "structured": parsed,
             }
 
-        merged_context = self._merge_structured_context(structured_context, sentiment)
         response, parsed = self._fallback_structured_output(user_message, merged_context, sentiment)
+        intelligent_score = self._compute_intelligent_stress_score(user_message, merged_context, sentiment, parsed)
+        parsed["stress_score"] = str(intelligent_score)
+        parsed["stress_level"] = self._stress_level_from_score(intelligent_score)
         emotion = str(parsed.get("emotion", sentiment.get("sentiment", "neutral")))
         confidence = float(sentiment.get("confidence", 0.68))
         return {
             "response": response,
             "detected_emotion": emotion,
             "confidence": confidence,
+            "stress_score": intelligent_score,
+            "stress_level": self._stress_level_from_score(intelligent_score).lower(),
             "pipeline": {
                 "sentiment_model": sentiment.get("source", "unknown"),
                 "groq_chat": False,

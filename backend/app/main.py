@@ -6,8 +6,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import analyze, chatbot, mood, detection, recommendations
 from app.core.config import get_settings
+from app.db.session import engine
+from app.db.base import Base
+
+# Import all models to register them with Base
+from app.models.user import User
+from app.models.session import ChatSession, ChatMessage
+from app.models.mood import MoodEntry
 
 settings = get_settings()
+
+# Create all database tables
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.APP_NAME,

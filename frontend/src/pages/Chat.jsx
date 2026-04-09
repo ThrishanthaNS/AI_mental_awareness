@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 
 const Chat = () => {
   const [messages, setMessages] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [videoActive, setVideoActive] = useState(false);
   const [sessionId, setSessionId] = useState(null);

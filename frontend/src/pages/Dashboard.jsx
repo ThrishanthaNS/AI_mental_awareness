@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getChatInsights } from '../services/api';
 
-// Mock data for demo
-const stressData = {
+const defaultStressData = {
   currentScore: 78,
   previousScore: 76,
   riskLevel: 'high',
@@ -33,8 +33,64 @@ const stressData = {
   ],
   peakStressTime: '10:00 PM',
   interventionTime: '9:30 PM',
+  interventionWindowMinutes: 15,
   burnoutRisk: 'HIGH',
   burnoutDays: 3,
+};
+
+const levelToScore = {
+  low: 25,
+  moderate: 55,
+  medium: 55,
+  high: 85,
+};
+
+const formatDay = (isoDate) => {
+  if (!isoDate) return 'N/A';
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleDateString('en-US', { weekday: 'short' });
+};
+
+const toNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const pickStressScore = (message) => {
+  const direct = toNumber(message?.stress_score);
+  if (direct !== null) {
+    return Math.max(0, Math.min(100, direct));
+  }
+
+  const levelRaw = String(message?.stress_level || '').toLowerCase().trim();
+  if (levelRaw in levelToScore) {
+    return levelToScore[levelRaw];
+  }
+
+  return null;
+};
+
+const buildRecommendations = (score) => {
+  if (score >= 70) {
+    return [
+      'Take a 10-minute reset break away from screens now',
+      'Reduce one non-urgent task from today\'s list',
+      'Try a 4-4-6 breathing cycle for two minutes',
+    ];
+  }
+  if (score >= 40) {
+    return [
+      'Do one focused task block, then take a short break',
+      'Hydrate and stretch for 3 minutes',
+      'Write down your top 2 priorities for the next hour',
+    ];
+  }
+  return [
+    'Maintain your current routine with regular breaks',
+    'Keep a short gratitude or progress note today',
+    'Plan one small recovery activity for tonight',
+  ];
 };
 
 const getRiskColor = (score) => {
@@ -49,7 +105,7 @@ const getRiskIcon = (risk) => {
   return '◉';
 };
 
-function TrendChart() {
+function TrendChart({ trendData, dayLabels }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -65,7 +121,8 @@ function TrendChart() {
     context.scale(dpr, dpr);
     context.clearRect(0, 0, width, height);
 
-    const data = stressData.trendData;
+    const data = trendData;
+    if (!data || data.length === 0) return;
     const padding = 60;
     const innerWidth = width - padding * 2;
     const innerHeight = height - padding * 2 - 30;
@@ -86,7 +143,7 @@ function TrendChart() {
 
     // Line chart
     const points = data.map((value, index) => ({
-      x: padding + (innerWidth / (data.length - 1)) * index,
+      x: padding + (innerWidth / Math.max(data.length - 1, 1)) * index,
       y: padding + innerHeight - ((value - min) / range) * innerHeight,
       value: value,
     }));
@@ -139,15 +196,100 @@ function TrendChart() {
       context.fillStyle = 'rgba(168, 179, 193, 0.7)';
       context.font = '12px Inter, system-ui';
       context.textAlign = 'center';
-      const dayLabel = stressData.dayLabels[index];
+      const dayLabel = dayLabels[index] || '';
       context.fillText(dayLabel, point.x, height - padding + 15);
     });
-  }, []);
+  }, [trendData, dayLabels]);
 
   return <canvas ref={canvasRef} className="trend-chart" aria-label="7-day stress trend chart" />;
 }
 
 function Dashboard() {
+  const [stressData, setStressData] = useState(defaultStressData);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError('');
+        const insights = await getChatInsights(1);
+
+        if (!mounted) return;
+
+        const trendData = Array.isArray(insights?.trend_data) && insights.trend_data.length
+          ? insights.trend_data.map((v) => Math.round(Number(v) || 0))
+          : [0];
+        const dayLabels = Array.isArray(insights?.day_labels) && insights.day_labels.length
+          ? insights.day_labels
+          : [formatDay(new Date().toISOString())];
+
+        const currentScore = Math.round(Number(insights?.current_score) || 0);
+        const previousScore = Math.round(Number(insights?.previous_score) || currentScore);
+        const riskLevel = getRiskColor(currentScore);
+        const signals = insights?.signals || {};
+        const emotionalSignals = signals?.emotional || {};
+        const contextualSignals = signals?.contextual || {};
+
+        setStressData((prev) => ({
+          ...prev,
+          currentScore,
+          previousScore,
+          riskLevel,
+          trendData,
+          dayLabels,
+          behaviors: {
+            typingSpeed: {
+              value: signals?.behavioral?.activity || 'No activity',
+              change: signals?.behavioral?.late_night_activity || '0 late-night messages',
+            },
+            screenTime: `Total messages: ${contextualSignals?.messages || 0}`,
+          },
+          emotions: {
+            face: `Dominant emotion: ${emotionalSignals?.dominant_emotion || 'neutral'}`,
+            voice: `High-stress ratio: ${emotionalSignals?.high_stress_ratio || '0%'}`,
+          },
+          context: {
+            role: contextualSignals?.user || 'User 1',
+            workload: `Sessions: ${contextualSignals?.sessions || 0}`,
+            age: contextualSignals?.messages || 0,
+          },
+          riskFactors: Array.isArray(insights?.risk_factors) && insights.risk_factors.length
+            ? insights.risk_factors
+            : prev.riskFactors,
+          recommendations: Array.isArray(insights?.recommendations) && insights.recommendations.length
+            ? insights.recommendations
+            : buildRecommendations(currentScore),
+          peakStressTime: insights?.peak_stress_time || 'N/A',
+          interventionTime: insights?.intervention_time || 'N/A',
+          interventionWindowMinutes: Number(insights?.intervention_window_minutes) || 15,
+          burnoutRisk: insights?.burnout_risk || riskLevel.toUpperCase(),
+          burnoutDays: Number(insights?.burnout_days) || (riskLevel === 'high' ? 3 : riskLevel === 'medium' ? 7 : 14),
+        }));
+      } catch (error) {
+        if (mounted) {
+          setLoadError(error?.message || 'Unable to load dashboard data');
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadDashboardData();
+
+    const intervalId = setInterval(loadDashboardData, 12000);
+
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+    };
+  }, []);
+
   const riskClass = getRiskColor(stressData.currentScore);
   const [completedRecs, setCompletedRecs] = useState([]);
   const [expandedSignals, setExpandedSignals] = useState({
@@ -181,6 +323,11 @@ function Dashboard() {
   const scoreChange = stressData.currentScore - stressData.previousScore;
   const changeDirection = scoreChange > 0 ? '↑' : scoreChange < 0 ? '↓' : '→';
   const changeColor = scoreChange > 0 ? '#ef4444' : scoreChange < 0 ? '#10b981' : '#a8b3c1';
+  const burnoutRiskClass = String(stressData.burnoutRisk || '').toLowerCase();
+  const burnoutEmoji = burnoutRiskClass === 'high' ? '🔴' : burnoutRiskClass === 'medium' ? '🟠' : '🟢';
+  const interventionWindowText = stressData.interventionWindowMinutes > 0
+    ? `${stressData.interventionWindowMinutes} min before`
+    : 'based on latest pattern';
 
   return (
     <div className="dashboard-page">
@@ -229,15 +376,29 @@ function Dashboard() {
         {/* Trend Section */}
         <div className="card">
           <h2 className="card-title">📊 Stress Trend (Last 7 Days)</h2>
-          <TrendChart />
+          <TrendChart trendData={stressData.trendData} dayLabels={stressData.dayLabels} />
           <div className="trend-meta">
             <span>Mon → Sun</span>
-            <span className="trend-increase">↑ 35% increase this week</span>
+            <span className="trend-increase">
+              {scoreChange > 0 ? `↑ ${Math.abs(scoreChange)} increase` : scoreChange < 0 ? `↓ ${Math.abs(scoreChange)} decrease` : '→ no change'}
+            </span>
           </div>
           <div className="trend-comparison">
-            Peak on Sunday (78 pts) • Lowest on Monday (55 pts) • Avg this week: 67 pts
+            Peak: {Math.max(...stressData.trendData)} pts • Lowest: {Math.min(...stressData.trendData)} pts • Avg: {Math.round(stressData.trendData.reduce((sum, value) => sum + value, 0) / Math.max(stressData.trendData.length, 1))} pts
           </div>
         </div>
+
+        {isLoading && (
+          <div className="card" style={{ fontSize: '0.92rem', color: 'var(--ink-soft)' }}>
+            Loading latest stress data from database...
+          </div>
+        )}
+
+        {!isLoading && loadError && (
+          <div className="card" style={{ fontSize: '0.92rem', color: '#fca5a5' }}>
+            Could not refresh live stress data: {loadError}
+          </div>
+        )}
 
         {/* Multi-Modal Signals */}
         <div className="card" id="patterns">
@@ -257,18 +418,18 @@ function Dashboard() {
                 <div className="signal-details">
                   <div className="signal-item">
                     <span className="signal-label">Typing Speed</span>
-                    <span className="signal-value">{stressData.behaviors.typingSpeed.change}</span>
+                    <span className="signal-value">{stressData.behaviors.typingSpeed.value}</span>
                   </div>
                   <div className="signal-item">
-                    <span className="signal-label">Screen Time</span>
-                    <span className="signal-value">{stressData.behaviors.screenTime}</span>
+                    <span className="signal-label">Late Night</span>
+                    <span className="signal-value">{stressData.behaviors.typingSpeed.change}</span>
                   </div>
                 </div>
               )}
               {!expandedSignals.behavioral && (
                 <div className="signal-item">
                   <span className="signal-label">Activity</span>
-                  <span className="signal-value">2 signals detected</span>
+                  <span className="signal-value">{stressData.behaviors.typingSpeed.value}</span>
                 </div>
               )}
             </div>
@@ -298,7 +459,7 @@ function Dashboard() {
               {!expandedSignals.emotional && (
                 <div className="signal-item">
                   <span className="signal-label">Status</span>
-                  <span className="signal-value">2 indicators</span>
+                  <span className="signal-value">{stressData.emotions.voice}</span>
                 </div>
               )}
             </div>
@@ -332,7 +493,7 @@ function Dashboard() {
               {!expandedSignals.context && (
                 <div className="signal-item">
                   <span className="signal-label">Context</span>
-                  <span className="signal-value">3 factors</span>
+                  <span className="signal-value">{stressData.context.workload}</span>
                 </div>
               )}
             </div>
@@ -363,7 +524,7 @@ function Dashboard() {
             <div className="recommendations">
               {visibleRecs.map((rec, index) => (
                 <div
-                  key={index}
+                  key={`${rec}-${index}`}
                   className={`recommendation-item ${completedRecs.includes(index) ? 'done' : ''}`}
                   onClick={() => toggleRecommendation(index)}
                   role="button"
@@ -400,7 +561,7 @@ function Dashboard() {
           <div>
             <div className="intervention-time">{stressData.interventionTime}</div>
             <div className="intervention-meta">
-              Peak stress expected at {stressData.peakStressTime} | Recommended action window: 15 min before
+              Peak stress expected at {stressData.peakStressTime} | Recommended action window: {interventionWindowText}
             </div>
           </div>
         </div>
@@ -408,8 +569,8 @@ function Dashboard() {
         {/* Burnout Prediction */}
         <div className="burnout-card">
           <div className="burnout-status">
-            <div className="burnout-indicator" />
-            <div className="burnout-risk-text">Burnout Risk: 🔴 {stressData.burnoutRisk}</div>
+            <div className={`burnout-indicator ${burnoutRiskClass || 'low'}`} />
+            <div className={`burnout-risk-text ${burnoutRiskClass || 'low'}`}>Burnout Risk: {burnoutEmoji} {stressData.burnoutRisk}</div>
           </div>
           <div className="burnout-description">
             Burnout likely in{' '}

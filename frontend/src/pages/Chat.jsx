@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 
 const Chat = () => {
   const [messages, setMessages] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [videoActive, setVideoActive] = useState(false);
   const mediaRecorderRef = useRef(null);
@@ -22,11 +23,17 @@ const Chat = () => {
     setMessages((prev) => [...prev, userMessage]);
 
     try {
-      const response = await sendMessage(message, mediaType, mediaData);
+      const response = await sendMessage(message, mediaType, mediaData, sessionId);
+      if (response?.session_id) {
+        setSessionId(response.session_id);
+      }
       const botMessage = {
         role: 'assistant',
         content: response?.response || 'I am here with you. Try sharing a bit more about what you feel right now.',
         mediaType: 'text',
+        stressScore: response?.stress_score,
+        stressLevel: response?.stress_level,
+        detectedEmotion: response?.detected_emotion,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, botMessage]);

@@ -133,4 +133,11 @@ def calculate_stress(
         "stress_score": stress_score,
         "risk_level": risk_level,
         "suggestion": suggestion,
+        "breakdown": {
+            "typing": round(typing_score, 2),
+            "screen_time": round(screen_score, 2),
+            "text": round(text_score, 2),
+            "voice": round(voice_score, 2),
+            "facial": round(face_score, 2),
+        },
     }

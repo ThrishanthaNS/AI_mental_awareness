@@ -4,7 +4,7 @@ AI Mental Awareness - FastAPI Application Entry Point
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, mood, chatbot, detection, recommendations, analyze
+from app.api.routes import analyze
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -24,12 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(mood.router, prefix="/api/v1")
-app.include_router(chatbot.router, prefix="/api/v1")
-app.include_router(detection.router, prefix="/api/v1")
-app.include_router(recommendations.router, prefix="/api/v1")
+# Include only demo-stable routers
 app.include_router(analyze.router, prefix="/api/v1")
 app.include_router(analyze.router)
 

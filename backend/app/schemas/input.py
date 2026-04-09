@@ -40,6 +40,14 @@ class AnalyzeInput(BaseModel):
     )
 
 
+class ScoreBreakdown(BaseModel):
+    typing: float = Field(..., ge=0, le=100)
+    screen_time: float = Field(..., ge=0, le=100)
+    text: float = Field(..., ge=0, le=100)
+    voice: float = Field(..., ge=0, le=100)
+    facial: float = Field(..., ge=0, le=100)
+
+
 class AnalyzeOutput(BaseModel):
     stress_score: float = Field(
         ...,
@@ -54,4 +62,8 @@ class AnalyzeOutput(BaseModel):
     suggestion: str = Field(
         ...,
         description="Actionable recommendation based on risk",
+    )
+    breakdown: ScoreBreakdown = Field(
+        ...,
+        description="Explainability breakdown for each stress factor",
     )

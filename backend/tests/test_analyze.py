@@ -22,6 +22,14 @@ def test_analyze_low_risk_payload():
     assert 0 <= body["stress_score"] <= 100
     assert body["risk_level"] in {"low", "medium", "high"}
     assert isinstance(body["suggestion"], str) and len(body["suggestion"]) > 0
+    assert isinstance(body["breakdown"], dict)
+    assert set(body["breakdown"].keys()) == {
+        "typing",
+        "screen_time",
+        "text",
+        "voice",
+        "facial",
+    }
 
 
 def test_analyze_high_risk_payload():
@@ -39,3 +47,5 @@ def test_analyze_high_risk_payload():
     body = response.json()
     assert body["risk_level"] == "high"
     assert body["stress_score"] >= 70
+    assert body["breakdown"]["voice"] == 100
+    assert body["breakdown"]["facial"] == 85

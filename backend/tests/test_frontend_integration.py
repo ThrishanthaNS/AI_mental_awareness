@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from unittest.mock import patch
 
 from app.main import app
 
@@ -51,8 +52,56 @@ def test_mood_and_detection_endpoints_available():
     assert detect_response.status_code == 200
     assert "emotion" in detect_response.json()
 
+    media_response = client.post(
+        "/api/v1/detect/media",
+        files={"file": ("frame.jpg", b"fake-image-bytes", "image/jpeg")},
+    )
+    assert media_response.status_code == 200
+    media_body = media_response.json()
+    assert "status" in media_body
+    assert "emotion" in media_body
+    assert "confidence" in media_body
+    assert "risk_level" in media_body
+
 
 def test_recommendations_endpoint_available():
     response = client.get("/api/v1/recommendations/")
     assert response.status_code == 200
     assert "recommendations" in response.json()
+
+
+def test_chat_video_contract_contains_analysis():
+    response = client.post(
+        "/api/v1/chat/message",
+        data={"message": "Analyze my expression", "media_type": "video"},
+        files={"media": ("frame.jpg", b"fake-image-bytes", "image/jpeg")},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "video_analysis" in body
+    assert set(body["video_analysis"].keys()) == {"status", "emotion", "confidence", "risk_level"}
+
+
+def test_chat_audio_flow_transcribes_voice_to_text():
+    with patch(
+        "app.api.routes.chatbot._speech_to_text_service.transcribe_audio_bytes",
+        return_value={
+            "status": "success",
+            "text": "I am feeling anxious today",
+            "confidence": 0.91,
+            "source": "groq_whisper",
+        },
+    ):
+        response = client.post(
+            "/api/v1/chat/message",
+            data={"message": "📎 Voice message", "media_type": "audio"},
+            files={"media": ("voice.wav", b"fake-audio-bytes", "audio/wav")},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "transcription" in body
+    assert body["transcription"]["status"] == "success"
+    assert body["transcription"]["text"] == "I am feeling anxious today"
+    assert "audio_debug" in body
+    assert isinstance(body["audio_debug"].get("audio_size_bytes"), int)

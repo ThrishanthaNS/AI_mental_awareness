@@ -1,14 +1,18 @@
 """
 Shared dependencies for API routes (auth, DB session, etc.).
 """
-from fastapi import Depends, HTTPException, status
+from app.db.session import SessionLocal
 
 
 async def get_current_user():
     """Dependency to get the current authenticated user from JWT token."""
-    pass
+    return {"id": 1}
 
 
-async def get_db():
+def get_db():
     """Dependency to get a database session."""
-    pass
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

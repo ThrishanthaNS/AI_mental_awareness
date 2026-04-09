@@ -129,7 +129,7 @@ function TrendChart() {
 
       // Value label
       context.fillStyle = '#e4e9f1';
-      context.font = 'bold 12px Inter, system-ui';
+      context.font = 'bold 12px Manrope, Segoe UI, sans-serif';
       context.textAlign = 'center';
       context.fillText(point.value.toString(), point.x, point.y - 15);
     });
@@ -137,7 +137,7 @@ function TrendChart() {
     // Day labels
     points.forEach((point, index) => {
       context.fillStyle = 'rgba(168, 179, 193, 0.7)';
-      context.font = '12px Inter, system-ui';
+      context.font = '12px Manrope, Segoe UI, sans-serif';
       context.textAlign = 'center';
       const dayLabel = stressData.dayLabels[index];
       context.fillText(dayLabel, point.x, height - padding + 15);
@@ -185,7 +185,7 @@ function Dashboard() {
   return (
     <div className="dashboard-page">
       {/* Navbar */}
-      <nav className="navbar">
+      <nav className="navbar reveal reveal-1">
         <div className="brand-block">
           <div className="brand-mark">M</div>
           <h1 className="brand-copy">MindGuard</h1>
@@ -199,7 +199,7 @@ function Dashboard() {
       {/* Main content */}
       <main className="dashboard-shell">
         {/* Hero Card */}
-        <div className="hero-card">
+        <div className="hero-card reveal reveal-2">
           <div className="stress-score">
             <div className={`stress-number ${riskClass}`}>{stressData.currentScore}</div>
             <div className="stress-label">/ 100 Stress Score</div>
@@ -227,7 +227,7 @@ function Dashboard() {
         </div>
 
         {/* Trend Section */}
-        <div className="card">
+        <div className="card reveal reveal-3">
           <h2 className="card-title">📊 Stress Trend (Last 7 Days)</h2>
           <TrendChart />
           <div className="trend-meta">
@@ -240,7 +240,7 @@ function Dashboard() {
         </div>
 
         {/* Multi-Modal Signals */}
-        <div className="card" id="patterns">
+        <div className="card reveal reveal-4" id="patterns">
           <h2 className="card-title">🧩 Multi-Modal Signals</h2>
           <div className="signals-grid">
             {/* Behavioral */}
@@ -340,7 +340,7 @@ function Dashboard() {
         </div>
 
         {/* Risk & Recommendations (2-column) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+        <div className="insights-grid reveal reveal-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
           {/* Risk Factors */}
           <div className="card">
             <h2 className="card-title">⚠️ Why are you stressed?</h2>
@@ -395,7 +395,7 @@ function Dashboard() {
         </div>
 
         {/* Intervention Timing */}
-        <div className="intervention-card">
+        <div className="intervention-card reveal reveal-6">
           <div className="intervention-title">⏱️ Intervention Timing</div>
           <div>
             <div className="intervention-time">{stressData.interventionTime}</div>
@@ -406,7 +406,7 @@ function Dashboard() {
         </div>
 
         {/* Burnout Prediction */}
-        <div className="burnout-card">
+        <div className="burnout-card reveal reveal-7">
           <div className="burnout-status">
             <div className="burnout-indicator" />
             <div className="burnout-risk-text">Burnout Risk: 🔴 {stressData.burnoutRisk}</div>

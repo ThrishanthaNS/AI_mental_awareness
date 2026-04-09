@@ -3,9 +3,10 @@ Mood database model.
 """
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from datetime import datetime
+from app.db.base import Base
 
 
-class MoodEntry:
+class MoodEntry(Base):
     """Model for storing user mood entries."""
     __tablename__ = "mood_entries"
 

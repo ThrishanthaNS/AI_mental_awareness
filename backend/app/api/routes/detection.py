@@ -6,7 +6,10 @@ from __future__ import annotations
 from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
 
+from app.services.emotion_detection_service import EmotionDetectionService
+
 router = APIRouter(prefix="/detect", tags=["Detection"])
+emotion_service = EmotionDetectionService()
 
 
 class DetectTextRequest(BaseModel):
@@ -16,16 +19,13 @@ class DetectTextRequest(BaseModel):
 @router.post("/text")
 async def detect_from_text(payload: DetectTextRequest):
     """Detect emotional state from text input."""
-    text = payload.text.lower()
-    if any(word in text for word in ["stress", "anxious", "overwhelmed", "burnout"]):
-        return {"emotion": "stressed", "confidence": 0.84}
-    if any(word in text for word in ["happy", "good", "calm", "great"]):
-        return {"emotion": "positive", "confidence": 0.79}
-    return {"emotion": "neutral", "confidence": 0.62}
+    return emotion_service.detect_from_text(payload.text)
 
 
 @router.post("/media")
 async def detect_from_media(file: UploadFile = File(...)):
-    """Detect emotional state from uploaded media (image/audio)."""
-    await file.read()
-    return {"emotion": "neutral", "confidence": 0.7, "source": file.filename}
+    """Detect emotional state from uploaded media (image/video)."""
+    content = await file.read()
+    result = emotion_service.detect_from_video_bytes(content, filename=file.filename)
+    result["source"] = file.filename
+    return result

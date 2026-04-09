@@ -15,7 +15,15 @@ export const sendMessage = async (message, mediaType = 'text', mediaData = null,
     const formData = new FormData();
     formData.append('message', message);
     formData.append('media_type', mediaType);
-    formData.append('media', mediaData);
+    if (mediaData) {
+      if (mediaType === 'audio') {
+        const audioExt = mediaData.type.includes('webm') ? 'webm' : mediaData.type.includes('wav') ? 'wav' : 'ogg';
+        formData.append('media', mediaData, `voice.${audioExt}`);
+      } else {
+        const videoExt = mediaData.type.includes('png') ? 'png' : mediaData.type.includes('jpeg') ? 'jpg' : 'webm';
+        formData.append('media', mediaData, `capture.${videoExt}`);
+      }
+    }
     if (sessionId) formData.append('session_id', sessionId);
 
     const response = await fetch(url, {

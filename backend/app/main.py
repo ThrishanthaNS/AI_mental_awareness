@@ -4,6 +4,9 @@ AI Mental Awareness - FastAPI Application Entry Point
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.db.base import Base
+from app.db.session import engine
+from app import models  # noqa: F401
 from app.api.routes import analyze, chatbot, mood, detection, recommendations
 from app.core.config import get_settings
 
@@ -31,6 +34,12 @@ app.include_router(chatbot.router, prefix="/api/v1")
 app.include_router(mood.router, prefix="/api/v1")
 app.include_router(detection.router, prefix="/api/v1")
 app.include_router(recommendations.router, prefix="/api/v1")
+
+
+@app.on_event("startup")
+def create_db_tables() -> None:
+    """Create SQLite tables at startup if they do not exist."""
+    Base.metadata.create_all(bind=engine)
 
 
 @app.get("/")

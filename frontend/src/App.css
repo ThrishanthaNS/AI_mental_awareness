@@ -2,8 +2,8 @@
 
 :root {
   color-scheme: dark;
-  --bg-0: #081018;
-  --bg-1: #132133;
+  --bg-0: #07101d;
+  --bg-1: #0f1c2f;
   --bg-card: rgba(17, 22, 33, 0.82);
   --bg-card-strong: rgba(16, 20, 30, 0.95);
   --ink: #eef2ff;
@@ -13,12 +13,12 @@
   --radius-xl: 22px;
   --radius-lg: 16px;
   --radius-md: 12px;
-  --risk-low: #2fd08b;
-  --risk-med: #ffd64b;
-  --risk-high: #ff6a65;
-  --accent-a: #47d9ff;
-  --accent-b: #69ffb2;
-  --accent-c: #ffb55f;
+  --risk-low: #4dc9ff;
+  --risk-med: #68a9ff;
+  --risk-high: #8a89ff;
+  --accent-a: #47b6ff;
+  --accent-b: #5d9dff;
+  --accent-c: #7f8dff;
   --signal-behavioral: #4dd4ff;
   --signal-emotional: #ff9a64;
   --signal-context: #44d39a;
@@ -41,8 +41,8 @@ body {
   font-family: Manrope, 'Segoe UI', sans-serif;
   background:
     radial-gradient(900px 500px at 88% -10%, rgba(71, 217, 255, 0.2), transparent 60%),
-    radial-gradient(900px 500px at 8% 0%, rgba(105, 255, 178, 0.18), transparent 56%),
-    radial-gradient(740px 430px at 45% 100%, rgba(255, 181, 95, 0.16), transparent 64%),
+    radial-gradient(900px 500px at 8% 0%, rgba(93, 157, 255, 0.18), transparent 56%),
+    radial-gradient(740px 430px at 45% 100%, rgba(127, 141, 255, 0.16), transparent 64%),
     linear-gradient(160deg, var(--bg-0), var(--bg-1));
   overflow-x: hidden;
 }
@@ -70,7 +70,7 @@ body::before {
 body::after {
   right: -120px;
   bottom: 10%;
-  background: rgba(255, 181, 95, 0.28);
+  background: rgba(127, 141, 255, 0.28);
   animation: floatBlobB 14s ease-in-out infinite;
 }
 
@@ -435,11 +435,11 @@ button {
 }
 
 .risk-item {
-  background: linear-gradient(120deg, rgba(255, 106, 101, 0.16), rgba(255, 181, 95, 0.12));
+  background: linear-gradient(120deg, rgba(93, 157, 255, 0.18), rgba(127, 141, 255, 0.12));
 }
 
 .recommendation-item {
-  background: linear-gradient(120deg, rgba(105, 255, 178, 0.16), rgba(71, 217, 255, 0.12));
+  background: linear-gradient(120deg, rgba(71, 182, 255, 0.16), rgba(93, 157, 255, 0.12));
   cursor: pointer;
 }
 
@@ -472,7 +472,7 @@ button {
 .intervention-card {
   background:
     radial-gradient(400px 200px at 95% 0%, rgba(71, 217, 255, 0.16), transparent 72%),
-    radial-gradient(300px 160px at 5% 90%, rgba(255, 181, 95, 0.16), transparent 70%),
+    radial-gradient(300px 160px at 5% 90%, rgba(127, 141, 255, 0.16), transparent 70%),
     rgba(10, 15, 25, 0.9);
 }
 
@@ -497,7 +497,7 @@ button {
 }
 
 .burnout-card {
-  background: linear-gradient(125deg, rgba(255, 106, 101, 0.2), rgba(255, 181, 95, 0.15));
+  background: linear-gradient(125deg, rgba(93, 157, 255, 0.2), rgba(127, 141, 255, 0.15));
 }
 
 .burnout-status {
@@ -521,7 +521,7 @@ button {
 }
 
 .burnout-indicator.medium {
-  background: var(--risk-medium);
+  background: var(--risk-med);
   box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
 }
 
@@ -727,7 +727,7 @@ button {
   padding: 8px 12px;
   font-size: 0.83rem;
   color: #d8e4ff;
-  background: linear-gradient(120deg, rgba(71, 217, 255, 0.16), rgba(255, 181, 95, 0.14));
+  background: linear-gradient(120deg, rgba(71, 217, 255, 0.16), rgba(127, 141, 255, 0.14));
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
@@ -753,7 +753,7 @@ button {
 
 .message.assistant {
   margin-right: auto;
-  background: linear-gradient(120deg, rgba(255, 181, 95, 0.12), rgba(71, 217, 255, 0.12));
+  background: linear-gradient(120deg, rgba(127, 141, 255, 0.12), rgba(71, 217, 255, 0.12));
 }
 
 .message p {
@@ -792,8 +792,8 @@ button {
 }
 
 .analyze-btn {
-  border-color: rgba(255, 181, 95, 0.45);
-  background: rgba(255, 181, 95, 0.16);
+  border-color: rgba(127, 141, 255, 0.45);
+  background: rgba(127, 141, 255, 0.16);
 }
 
 .chat-input-section {
@@ -1048,176 +1048,4 @@ button {
   }
 }
 
-/* Light joyful theme override */
-:root {
-  color-scheme: light;
-  --bg-0: #f6fcff;
-  --bg-1: #fffaf2;
-  --bg-card: rgba(255, 255, 255, 0.88);
-  --bg-card-strong: rgba(255, 255, 255, 0.95);
-  --ink: #1f2a44;
-  --ink-soft: #5f6f8c;
-  --line: rgba(96, 142, 199, 0.24);
-  --shadow: 0 20px 40px rgba(72, 117, 168, 0.16);
-  --risk-low: #20b981;
-  --risk-med: #ffb338;
-  --risk-high: #ff6b6b;
-  --accent-a: #4fb6ff;
-  --accent-b: #66e6b4;
-  --accent-c: #ffc266;
-}
 
-body {
-  color: var(--ink);
-  background:
-    radial-gradient(1100px 520px at 85% -15%, rgba(79, 182, 255, 0.22), transparent 62%),
-    radial-gradient(940px 480px at 15% 0%, rgba(102, 230, 180, 0.18), transparent 58%),
-    radial-gradient(900px 460px at 50% 100%, rgba(255, 194, 102, 0.2), transparent 62%),
-    linear-gradient(160deg, var(--bg-0), var(--bg-1));
-}
-
-body::before {
-  background: rgba(79, 182, 255, 0.26);
-  opacity: 0.5;
-}
-
-body::after {
-  background: rgba(255, 194, 102, 0.24);
-  opacity: 0.52;
-}
-
-.emoji-sky {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 2;
-}
-
-.floating-emoji {
-  position: absolute;
-  bottom: -8vh;
-  filter: drop-shadow(0 8px 10px rgba(37, 95, 156, 0.18));
-  opacity: 0;
-  animation-name: emojiFloat;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-
-.navbar,
-.hero-card,
-.card,
-.intervention-card,
-.burnout-card,
-.chatbot-container,
-.chat-page header,
-.video-chat-panel,
-.bottom-nav {
-  background: var(--bg-card);
-  border-color: rgba(96, 142, 199, 0.25);
-  box-shadow: var(--shadow);
-}
-
-.chat-input-section {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(250, 253, 255, 0.95));
-  border-top: 1px solid rgba(96, 142, 199, 0.2);
-}
-
-.chat-input {
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--ink);
-}
-
-.send-btn,
-.media-btn,
-.video-close-btn {
-  color: #1f2a44;
-  background: rgba(255, 255, 255, 0.95);
-}
-
-.message.user {
-  background: linear-gradient(120deg, rgba(79, 182, 255, 0.18), rgba(102, 230, 180, 0.16));
-}
-
-.message.assistant {
-  background: linear-gradient(120deg, rgba(255, 194, 102, 0.2), rgba(79, 182, 255, 0.14));
-}
-
-.risk-item {
-  background: linear-gradient(120deg, rgba(255, 194, 102, 0.22), rgba(255, 107, 107, 0.14));
-}
-
-.recommendation-item {
-  background: linear-gradient(120deg, rgba(102, 230, 180, 0.2), rgba(79, 182, 255, 0.16));
-}
-
-.chat-welcome {
-  border: 1px dashed rgba(96, 142, 199, 0.34);
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.prompt-btn {
-  color: #294066;
-}
-
-.role-badge {
-  color: #1f5d8a;
-  background: rgba(79, 182, 255, 0.16);
-}
-
-.user-icon {
-  background: rgba(255, 194, 102, 0.24);
-  color: #3e2e1f;
-}
-
-.brand-mark {
-  color: #193f63;
-}
-
-.back-link {
-  color: #2f6da0;
-}
-
-.nav-button {
-  color: #4f6184;
-}
-
-.nav-button.active {
-  background: linear-gradient(135deg, rgba(79, 182, 255, 0.26), rgba(255, 194, 102, 0.24));
-  color: #234769;
-}
-
-.video-analysis-card {
-  border: 1px solid rgba(79, 182, 255, 0.3);
-  background: rgba(79, 182, 255, 0.1);
-}
-
-.video-analysis-title {
-  color: #2f6da0;
-}
-
-@keyframes emojiFloat {
-  0% {
-    transform: translateY(0) translateX(0) rotate(0deg) scale(0.92);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.95;
-  }
-  50% {
-    transform: translateY(-46vh) translateX(14px) rotate(6deg) scale(1.05);
-  }
-  85% {
-    opacity: 0.9;
-  }
-  100% {
-    transform: translateY(-108vh) translateX(-12px) rotate(-6deg) scale(1.08);
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .emoji-sky {
-    display: none;
-  }
-}

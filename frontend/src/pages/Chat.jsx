@@ -8,7 +8,6 @@ const Chat = () => {
   const [sessionId, setSessionId] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [videoActive, setVideoActive] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const videoStreamRef = useRef(null);

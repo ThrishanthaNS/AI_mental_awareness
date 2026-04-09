@@ -48,6 +48,13 @@ class ScoreBreakdown(BaseModel):
     facial: float = Field(..., ge=0, le=100)
 
 
+class PipelineMeta(BaseModel):
+    sentiment_model: str
+    logreg_calibration: bool
+    llm_suggestion: bool
+    llm_provider: str
+
+
 class AnalyzeOutput(BaseModel):
     stress_score: float = Field(
         ...,
@@ -66,4 +73,8 @@ class AnalyzeOutput(BaseModel):
     breakdown: ScoreBreakdown = Field(
         ...,
         description="Explainability breakdown for each stress factor",
+    )
+    pipeline: PipelineMeta = Field(
+        ...,
+        description="Pipeline trace (sentiment model, logistic calibration, and LLM suggestion usage)",
     )

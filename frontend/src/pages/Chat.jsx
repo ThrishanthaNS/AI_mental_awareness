@@ -25,7 +25,8 @@ const Chat = () => {
       const response = await sendMessage(message, mediaType, mediaData);
       const botMessage = {
         role: 'assistant',
-        content: response.response,
+        content: response?.response || 'I am here with you. Try sharing a bit more about what you feel right now.',
+        mediaType: 'text',
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, botMessage]);

@@ -1,7 +1,5 @@
-"""
-Application configuration and settings.
-"""
-from pydantic_settings import BaseSettings
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
@@ -22,9 +20,23 @@ class Settings(BaseSettings):
     SENTIMENT_MODEL_PATH: str = "../../ml/models/sentiment_model.pkl"
     STRESS_MODEL_PATH: str = "../../ml/models/stress_model.pkl"
     EMOTION_MODEL_PATH: str = "../../ml/models/emotion_model.h5"
+    STRESS_LOGREG_MODEL_PATH: str = "../../ml/models/stress_logreg.pkl"
+    HUGGINGFACE_SENTIMENT_MODEL: str = "distilbert-base-uncased-finetuned-sst-2-english"
 
-    class Config:
-        env_file = ".env"
+    # Groq LLM
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_FALLBACK_MODEL: str = "llama-3.1-8b-instant"
+    ENABLE_GROQ_SUGGESTIONS: bool = True
+
+    # Resolve env from backend/.env first, then project-root .env.
+    model_config = SettingsConfigDict(
+        env_file=(
+            str(Path(__file__).resolve().parents[2] / ".env"),
+            str(Path(__file__).resolve().parents[3] / ".env"),
+        ),
+        extra="ignore",
+    )
 
 
 @lru_cache()

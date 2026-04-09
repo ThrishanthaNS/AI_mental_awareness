@@ -106,7 +106,7 @@ const Chatbot = ({
                   <span>Video message</span>
                 </div>
               )}
-              {msg.mediaType === 'text' && <p>{msg.content}</p>}
+              {(msg.mediaType === 'text' || !msg.mediaType) && <p>{msg.content}</p>}
             </div>
           ))}
       </div>

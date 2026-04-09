@@ -240,7 +240,7 @@ function Dashboard() {
         </div>
 
         {/* Multi-Modal Signals */}
-        <div className="card">
+        <div className="card" id="patterns">
           <h2 className="card-title">🧩 Multi-Modal Signals</h2>
           <div className="signals-grid">
             {/* Behavioral */}
@@ -427,18 +427,7 @@ function Dashboard() {
             Chat with our AI wellness assistant for immediate guidance
           </p>
           <Link to="/chat" style={{ display: 'inline-block' }}>
-            <button
-              style={{
-                padding: '12px 28px',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))',
-                color: 'white',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontSize: '0.95rem',
-              }}
-            >
+            <button className="cta-button">
               Open Chat
             </button>
           </Link>

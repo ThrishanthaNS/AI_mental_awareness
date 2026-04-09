@@ -4,9 +4,12 @@ Core stress scoring service used by the /analyze endpoint.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from app.core.config import get_settings
+from app.services.llm_suggestion_service import LLMSuggestionService
+from app.services.sentiment_service import SentimentService
 
 
 RiskLevel = Literal["low", "medium", "high"]
@@ -23,8 +26,50 @@ class ScoringWeights:
     face: float = 0.05
 
 
-_analyzer = SentimentIntensityAnalyzer()
 _weights = ScoringWeights()
+_settings = get_settings()
+_sentiment_service = SentimentService()
+_llm_suggestion_service = LLMSuggestionService()
+
+
+class StressLogRegCalibrator:
+    """Optional Logistic Regression calibrator loaded from ml/models."""
+
+    def __init__(self):
+        self.model = None
+        self._attempted_load = False
+
+    def _load_model(self):
+        if self._attempted_load:
+            return
+        self._attempted_load = True
+
+        try:
+            import joblib
+
+            project_root = Path(__file__).resolve().parents[3]
+            model_path = project_root / "ml" / "models" / "stress_logreg.pkl"
+            if model_path.exists():
+                self.model = joblib.load(model_path)
+        except Exception:
+            self.model = None
+
+    def predict_probability(self, features: list[float]) -> float | None:
+        self._load_model()
+        if self.model is None:
+            return None
+
+        try:
+            if hasattr(self.model, "predict_proba"):
+                return float(self.model.predict_proba([features])[0][1])
+            # Fallback for models without predict_proba
+            pred = float(self.model.predict([features])[0])
+            return max(0.0, min(1.0, pred))
+        except Exception:
+            return None
+
+
+_logreg_calibrator = StressLogRegCalibrator()
 
 
 def _typing_stress_score(typing_speed: float) -> float:
@@ -53,14 +98,15 @@ def _screen_stress_score(screen_time: float) -> float:
     return ratio * 100
 
 
-def _text_stress_score(text_input: str) -> float:
+def _text_stress_score(text_input: str) -> tuple[float, dict]:
     """
-    Convert VADER compound sentiment into stress.
+    Convert signed sentiment score (-1 to +1) into stress.
     Negative sentiment increases stress, positive lowers it.
     """
-    compound = _analyzer.polarity_scores(text_input).get("compound", 0.0)
-    stress = (1 - compound) / 2 * 100
-    return max(0.0, min(100.0, stress))
+    sentiment = _sentiment_service.analyze(text_input)
+    signed_score = float(sentiment.get("signed_score", 0.0))
+    stress = (1 - signed_score) / 2 * 100
+    return max(0.0, min(100.0, stress)), sentiment
 
 
 def _voice_stress_score(voice_stress: VoiceStress | None) -> float:
@@ -107,17 +153,17 @@ def calculate_stress(
     text_input: str,
     voice_stress: VoiceStress | None = None,
     facial_emotion: FacialEmotion | None = None,
-) -> dict[str, float | str]:
+) -> dict:
     """
     Returns a normalized stress output payload for the API.
     """
     typing_score = _typing_stress_score(typing_speed)
     screen_score = _screen_stress_score(screen_time)
-    text_score = _text_stress_score(text_input)
+    text_score, sentiment_meta = _text_stress_score(text_input)
     voice_score = _voice_stress_score(voice_stress)
     face_score = _facial_stress_score(facial_emotion)
 
-    weighted = (
+    weighted_rule_score = (
         typing_score * _weights.typing
         + screen_score * _weights.screen
         + text_score * _weights.text
@@ -125,9 +171,38 @@ def calculate_stress(
         + face_score * _weights.face
     )
 
-    stress_score = round(max(0.0, min(100.0, weighted)), 2)
+    features = [
+        typing_score,
+        screen_score,
+        text_score,
+        voice_score,
+        face_score,
+        float(sentiment_meta.get("confidence", 0.5)) * 100,
+    ]
+    logreg_probability = _logreg_calibrator.predict_probability(features)
+
+    if logreg_probability is None:
+        stress_score = round(max(0.0, min(100.0, weighted_rule_score)), 2)
+    else:
+        logreg_score = logreg_probability * 100
+        # Keep rule-based logic primary, blend calibrated ML score as enhancement.
+        blended = 0.8 * weighted_rule_score + 0.2 * logreg_score
+        stress_score = round(max(0.0, min(100.0, blended)), 2)
+
     risk_level = _risk_level(stress_score)
-    suggestion = _suggestion_for(risk_level)
+    llm_suggestion = _llm_suggestion_service.generate(
+        stress_score=stress_score,
+        risk_level=risk_level,
+        text_input=text_input,
+        breakdown={
+            "typing": round(typing_score, 2),
+            "screen_time": round(screen_score, 2),
+            "text": round(text_score, 2),
+            "voice": round(voice_score, 2),
+            "facial": round(face_score, 2),
+        },
+    )
+    suggestion = llm_suggestion or _suggestion_for(risk_level)
 
     return {
         "stress_score": stress_score,
@@ -139,5 +214,11 @@ def calculate_stress(
             "text": round(text_score, 2),
             "voice": round(voice_score, 2),
             "facial": round(face_score, 2),
+        },
+        "pipeline": {
+            "sentiment_model": sentiment_meta.get("source", "unknown"),
+            "logreg_calibration": bool(logreg_probability is not None),
+            "llm_suggestion": bool(llm_suggestion),
+            "llm_provider": "groq",
         },
     }
